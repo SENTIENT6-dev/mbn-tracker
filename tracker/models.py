@@ -293,8 +293,14 @@ class PCCF(models.Model):
 
 # ---------------------------------------------------------------- procurement
 
+def po_label(number):
+    """PO numbers as shown in the tracker: Access's 999-prefixed POs are written with ION instead (99900123 -> ION00123)."""
+    s = str(number).strip().upper()
+    return "ION" + s[3:] if s.startswith("999") and len(s) > 3 else s
+
+
 class PurchaseOrder(models.Model):
-    number = models.PositiveIntegerField("PO #", unique=True)
+    number = models.CharField("PO #", max_length=30, unique=True)
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="purchase_orders")
     vendor = models.ForeignKey(Company, on_delete=models.PROTECT, related_name="purchase_orders")
     approved_date = models.DateField(null=True, blank=True)

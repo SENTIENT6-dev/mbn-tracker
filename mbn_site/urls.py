@@ -30,9 +30,9 @@ urlpatterns = [
     # purchase orders, invoices, change orders
     path("pos/", v.po_list, name="po_list"),
     path("pos/new/", v.po_form, name="po_new"),
-    path("pos/<int:number>/", v.po_detail, name="po"),
-    path("pos/<int:number>/edit/", v.po_form, name="po_edit"),
-    path("pos/<int:number>/delete/", m.po_delete, name="po_delete"),
+    path("pos/<str:number>/", v.po_detail, name="po"),
+    path("pos/<str:number>/edit/", v.po_form, name="po_edit"),
+    path("pos/<str:number>/delete/", m.po_delete, name="po_delete"),
     path("invoices/", m.invoice_list, name="invoices"),
     path("invoices/new/", m.invoice_new, name="invoice_new"),
     path("invoices/<int:pk>/edit/", m.invoice_form, name="invoice_edit"),

@@ -400,7 +400,7 @@ def invoice_list(request):
 
 def invoice_new(request):
     initial = {"date": timezone.localdate()}
-    po = PurchaseOrder.objects.filter(number=request.GET.get("po") or 0).first()
+    po = PurchaseOrder.objects.filter(number=request.GET.get("po") or "").first()
     if po:
         initial["po"] = po
     form = F.NewInvoiceForm(request.POST or None, initial=initial, prefix="inv")

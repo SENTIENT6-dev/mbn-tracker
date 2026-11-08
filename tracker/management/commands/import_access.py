@@ -27,7 +27,7 @@ from django.utils import timezone
 
 from tracker.models import (PCCF, Building, BuildingRole, ChangeOrder, Company, CompanyType, DataIssue,
                             HeritageStatus, Invoice, Owner, Person, Project, ProjectStatus, Property, PurchaseOrder,
-                            RoleType, StageGate, StatusHistory, ValueOfWork)
+                            RoleType, StageGate, StatusHistory, ValueOfWork, po_label)
 
 ZERO = Decimal("0")
 H, M, L = DataIssue.Severity.HIGH, DataIssue.Severity.MEDIUM, DataIssue.Severity.LOW
@@ -354,7 +354,7 @@ class Command(BaseCommand):
                 self.skipped_pos.add(r["PONumber"])
                 continue
             self.po[r["PONumber"]] = PurchaseOrder.objects.create(
-                number=r["PONumber"], project=project, vendor=self.company[r["Vendor"]],
+                number=po_label(r["PONumber"]), project=project, vendor=self.company[r["Vendor"]],
                 approved_date=d(r["ApprovedDate"]), amount=n(r["Order"]))
         self.po_numbers = set(self.po)
 
@@ -374,19 +374,19 @@ class Command(BaseCommand):
             key = (po, num, amt, date)
             if key in seen:
                 self.issue("Duplicate invoice", H,
-                           f"Invoice {num} on PO {po} for ${amt:,} dated {date} was entered twice in Access and "
+                           f"Invoice {num} on PO {po_label(po)} for ${amt:,} dated {date} was entered twice in Access and "
                            f"counted twice. Imported once.", jsonable(r))
                 continue
             seen.add(key)
             inv = Invoice.objects.create(po=self.po[po], number=num, amount=amt, date=date)
             by_number_po[(po, num)].append(inv)
             if date and (date.year < 2010 or date > today + dt.timedelta(days=365)):
-                self.issue("Suspicious invoice date", M, f"Invoice {num} on PO {po} is dated {date}.",
+                self.issue("Suspicious invoice date", M, f"Invoice {num} on PO {po_label(po)} is dated {date}.",
                            {"invoice_id": inv.id}, inv.po.project)
         for (po, num), invs in by_number_po.items():
             if len(invs) > 1:
                 self.issue("Repeated invoice number", L,
-                           f"Invoice {num} appears {len(invs)} times on PO {po} with different amounts "
+                           f"Invoice {num} appears {len(invs)} times on PO {po_label(po)} with different amounts "
                            f"({', '.join(f'${i.amount:,}' for i in invs)}). Probably split lines; check if not.",
                            project=invs[0].po.project)
 

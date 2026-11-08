@@ -160,14 +160,15 @@ class Command(BaseCommand):
                 pos.append((vendors[rnd.choice([0, 2, 4])], m(parts["construction_cost"] * Decimal(".97")),
                             dates["construction_award"]))
             for vendor, amount, approved in pos:
-                po = PurchaseOrder.objects.create(number=po_no, project=p, vendor=vendor, amount=amount,
-                                                  approved_date=approved)
+                seq = po_no % 1000
+                po = PurchaseOrder.objects.create(number=f"ION{po_no % 100000:05d}", project=p, vendor=vendor,
+                                                  amount=amount, approved_date=approved)
                 po_no += 1
                 share = Decimal(str(min(progress * (1.3 if vendor is design_vendor else 1), 1)))
                 to_bill, n, d = m(amount * share), 1, add_months(approved, 1)
                 while to_bill > 0 and d <= today:
                     amt = min(to_bill, m(amount * Decimal(str(rnd.uniform(.08, .2)))))
-                    Invoice.objects.create(po=po, number=f"INV-{po.number % 1000:03d}-{n:02d}", amount=amt, date=d)
+                    Invoice.objects.create(po=po, number=f"INV-{seq:03d}-{n:02d}", amount=amt, date=d)
                     to_bill -= amt
                     n += 1
                     d = add_months(d, rnd.choice([1, 1, 2]))

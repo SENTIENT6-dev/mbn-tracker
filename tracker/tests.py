@@ -876,3 +876,24 @@ class TenderMilestoneTests(Base):
             r = self.client.get(url)
             self.assertContains(r, "Go to tender", msg_prefix=url)
             self.assertContains(r, "Mark tendered", msg_prefix=url)
+
+
+class IONPOTests(Base):
+    def test_po_label(self):
+        from .models import po_label
+        self.assertEqual([po_label(x) for x in (99900777, "9990045", " ion00123 ", 240001, "999")],
+                         ["ION00777", "ION0045", "ION00123", "240001", "999"])
+
+    def test_new_po_typed_with_999_is_saved_as_ion_and_pages_work(self):
+        r = self.client.post("/pos/new/", {"number": "99900555", "project": self.p.pk, "vendor": self.arch.pk,
+                                           "amount": "1000"})
+        po = PurchaseOrder.objects.get(number="ION00555")
+        self.assertRedirects(r, "/pos/ION00555/", fetch_redirect_response=False)
+        for url in ("/pos/ION00555/", "/pos/ION00555/edit/", "/pos/ION00555/delete/", "/pos/?q=ION",
+                    "/invoices/new/?po=ION00555"):
+            self.assertEqual(self.client.get(url).status_code, 200, url)
+        r = self.client.post("/pos/new/", {"number": "ION00555", "project": self.p.pk, "vendor": self.arch.pk,
+                                           "amount": "1"})
+        self.assertContains(r, "PO ION00555 already exists")
+        self.assertEqual(PurchaseOrder.objects.filter(number="ION00555").count(), 1)
+        self.assertEqual(po.vendor, self.arch)

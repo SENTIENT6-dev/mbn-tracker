@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -9,7 +10,7 @@ from .services import invoice_room, room_message, schedule_problems
 from .textutil import current_fiscal_year, fiscal_label
 
 from .models import (PCCF, Building, BuildingRole, ChangeOrder, Company, Invoice, Person, Project, ProjectStatus,
-                     Property, PurchaseOrder, ValueOfWork)
+                     Property, PurchaseOrder, ValueOfWork, po_label)
 
 DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
@@ -279,8 +280,16 @@ class PurchaseOrderForm(DateFieldsMixin, forms.ModelForm):
         model = PurchaseOrder
         fields = ["number", "approved_date", "amount", "project", "vendor"]
         labels = {"number": "PO #", "approved_date": "Approved date", "amount": "PO value"}
-        widgets = {"number": forms.TextInput(attrs={"placeholder": "e.g. 99900123", "inputmode": "numeric"})}
+        widgets = {"number": forms.TextInput(attrs={"placeholder": "e.g. ION00123", "autocapitalize": "characters"})}
         help_texts = {"amount": "Current value, including change orders already processed"}
+
+    def clean_number(self):
+        num = po_label(self.cleaned_data["number"])          # 999… is written as ION…
+        if not re.fullmatch(r"[A-Z0-9-]+", num):
+            raise forms.ValidationError("Use letters, digits and dashes only.")
+        if PurchaseOrder.objects.filter(number=num).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError(f"PO {num} already exists.")
+        return num
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

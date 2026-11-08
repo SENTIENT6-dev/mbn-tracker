@@ -10,7 +10,7 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from tracker.models import PCCF, DataIssue, Invoice, Project, PurchaseOrder  # noqa: F401
+from tracker.models import PCCF, DataIssue, Invoice, Project, PurchaseOrder, po_label  # noqa: F401
 
 # Invoice dates mistyped in Access, keyed (PO, invoice #[, wrong date]) -> right date.
 # The real list is specific to one PM's data, so it lives in _local_fixes.py (not published).
@@ -47,7 +47,7 @@ class Command(BaseCommand):
         d = i.detail
         if float(d.get("Amount") or 0) < 0:
             # A credit note entered twice is ambiguous: one copy may really be the original invoice it reverses.
-            po = PurchaseOrder.objects.filter(number=d.get("PONumber")).first()
+            po = PurchaseOrder.objects.filter(number=po_label(d.get("PONumber"))).first()
             if po and not i.summary.endswith("decide."):
                 same = Invoice.objects.filter(po=po, amount=-Decimal(str(d["Amount"]))).values_list("number", flat=True)
                 i.summary += (f" It's a credit note, so this needs a decision: one copy is counted now. "
@@ -62,7 +62,7 @@ class Command(BaseCommand):
     def h_invoice_on_unknown_po(self, i):
         d = i.detail
         num, amount = d.get("InvoiceNumber"), Decimal(str(d.get("Amount", 0))).quantize(Decimal("0.01"))
-        same = Invoice.objects.filter(number=num).exclude(po__number=d.get("PONumber")).select_related("po")
+        same = Invoice.objects.filter(number=num).exclude(po__number=po_label(d.get("PONumber"))).select_related("po")
         if same.filter(amount=amount).exists():
             po = same.filter(amount=amount).first().po.number
             close(i, f"Same invoice and amount is already recorded on PO {po}; PO {d.get('PONumber')} was a typo. "
@@ -81,7 +81,7 @@ class Command(BaseCommand):
             return
         fixed = None
         for key, new in DATE_FIXES.items():
-            if inv.po.number == key[0] and inv.number == key[1] and (len(key) == 2 or inv.date == key[2]):
+            if inv.po.number == po_label(key[0]) and inv.number == key[1] and (len(key) == 2 or inv.date == key[2]):
                 fixed = new
         if fixed:
             old, inv.date = inv.date, fixed

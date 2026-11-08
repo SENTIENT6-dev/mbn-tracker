@@ -383,8 +383,10 @@ class ProjectStatus(models.Model):
     actual_construction_award = models.DateField(null=True, blank=True)
     actual_substantial = models.DateField(null=True, blank=True)
     actual_closeout = models.DateField(null=True, blank=True)
+    # Going out to tender is due 30 days after the actual design end (see services.TENDER_DAYS)
+    actual_tender = models.DateField("tender issued", null=True, blank=True)
 
-    stage = models.ForeignKey(StageGate, on_delete=models.PROTECT, null=True, blank=True)
+    stage =models.ForeignKey(StageGate, on_delete=models.PROTECT, null=True, blank=True)
     comments = models.TextField(blank=True)
     risk = models.TextField(blank=True)
     final_mpsr = models.BooleanField(default=False)

@@ -20,6 +20,7 @@ urlpatterns = [
     path("projects/<int:pk>/edit/", v.project_form, name="project_edit"),
     path("projects/<int:pk>/delete/", m.project_delete, name="project_delete"),
     path("projects/<int:pk>/update/<str:section>/", v.project_update, name="project_update"),
+    path("projects/<int:pk>/tender/", v.tender_tick, name="tender_tick"),
     path("projects/<int:pk>/pccf/new/", v.pccf_form, name="pccf_new"),
     path("projects/<int:pk>/pccf/<int:pccf_id>/", v.pccf_form, name="pccf_edit"),
     path("projects/<int:pk>/pccf/<int:pccf_id>/delete/", m.pccf_delete, name="pccf_delete"),

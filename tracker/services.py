@@ -2,9 +2,11 @@
 Commitments, ApprovedSpend, BudgetWithoutFee, SumOfPendingCO, CurrentVOW,
 Project_Financials, MPSR, Contingencies, KahuaVoW, MPSR_Form_Query)."""
 from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db.models import Sum
+from django.utils import timezone
 
 from .models import PCCF, ChangeOrder, Invoice, Project, PurchaseOrder, ValueOfWork
 
@@ -305,6 +307,16 @@ MILESTONES = [  # key, label, forecast field, actual field, approved (PCCF) fiel
 ]
 
 
+TENDER_DAYS = 30   # once design is actually finished, the project must go out to tender within this many days
+
+
+def tender_deadline(status):
+    """Deadline to go out to tender, always worked out from the current actual design end date."""
+    if status is not None and status.actual_design_end:
+        return status.actual_design_end + timedelta(days=TENDER_DAYS)
+    return None
+
+
 @dataclass
 class Milestone:
     project: Project
@@ -314,10 +326,24 @@ class Milestone:
     forecast: object = None
     actual: object = None
     approved: object = None
+    awarded: object = None  # tender only: construction award date, which means the tender already happened
+
+    @property
+    def is_deadline(self):
+        """Tender's date is a deadline (worked out from design end), not a forecast someone entered."""
+        return self.key == "tender"
+
+    @property
+    def late_days(self):
+        """Tender only: days the tender went out (or, if still open, today) is past its deadline."""
+        if not self.is_deadline or (self.awarded and not self.actual):
+            return None
+        days = ((self.actual or timezone.localdate()) - self.forecast).days
+        return days if days > 0 else None
 
     @property
     def done(self):
-        return self.actual is not None
+        return self.actual is not None or self.awarded is not None
 
     def state(self, today):
         if self.done:
@@ -350,6 +376,10 @@ def milestones(projects):
             date = actual or forecast or approved
             if date:
                 events.append(Milestone(f.project, key, label, date, forecast, actual, approved))
+        due = tender_deadline(st)
+        if due:
+            events.append(Milestone(f.project, "tender", "Go to tender", st.actual_tender or due,
+                                    forecast=due, actual=st.actual_tender, awarded=st.actual_construction_award))
     return sorted(events, key=lambda e: (e.date, e.project.io_number))
 
 

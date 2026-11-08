@@ -537,8 +537,19 @@ class ForecastDatesForm(DateFieldsMixin, forms.ModelForm):
 class ActualsForm(DateFieldsMixin, forms.ModelForm):
     class Meta:
         model = ProjectStatus
-        fields = ["stage", "actual_design_end", "actual_construction_award", "actual_substantial",
+        fields = ["stage", "actual_design_end", "actual_tender", "actual_construction_award", "actual_substantial",
                   "actual_closeout", "final_mpsr"]
+        labels = {"actual_tender": "Tender issued"}
+        help_texts = {"actual_tender": "Due within 30 days of the actual design end"}
+
+    def clean(self):
+        data = super().clean()
+        design, tender = data.get("actual_design_end"), data.get("actual_tender")
+        if tender and not design:
+            self.add_error("actual_tender", "Enter the actual design end first; tendering follows it.")
+        elif tender and design and tender < design:
+            self.add_error("actual_tender", f"Can't be before the actual design end ({design}).")
+        return data
 
 
 class CommentForm(forms.Form):

@@ -52,8 +52,14 @@
       <table class="compact">
         <thead><tr><th></th><th>Approved</th><th>Forecast</th><th>Actual</th></tr></thead>
         <tbody>{% for e in events %}
+          {% if e.is_deadline %}
+          <tr><td>{{ e.label }}</td><td class="muted">–</td>
+            <td>{{ e.forecast }}<div class="muted" style="font-size:11.5px">deadline: design end + 30 days</div></td>
+            <td>{% if e.css == 'missed' %}<span class="mark missed">✗</span>{% endif %}{% if e.actual %}<span class="ink2" style="font-size:12px">{{ e.actual }}</span><br>{% endif %}{% include "tracker/_tender_tick.html" with e=e next=request.get_full_path %}</td></tr>
+          {% else %}
           <tr><td>{{ e.label }}</td><td>{{ e.approved|default:"–" }}</td><td>{{ e.forecast|default:"–" }}</td>
             <td>{% if e.actual %}<span class="mark done">✓</span>{{ e.actual }}{% elif e.css == 'missed' %}<span class="mark missed">✗</span><span class="neg">none</span>{% else %}–{% endif %}</td></tr>
+          {% endif %}
         {% empty %}<tr><td colspan="4" class="muted">No milestone dates yet.</td></tr>{% endfor %}</tbody>
       </table>
     </div>
@@ -87,6 +93,7 @@
       <div class="mpsr-row">
         <p>{{ f.act.stage.label_tag }}{{ f.act.stage }}{{ f.act.stage.errors }}</p>
         <p>{{ f.act.actual_design_end.label_tag }}{{ f.act.actual_design_end }}{{ f.act.actual_design_end.errors }}</p>
+        <p>{{ f.act.actual_tender.label_tag }}{{ f.act.actual_tender }}{{ f.act.actual_tender.errors }}</p>
         <p>{{ f.act.actual_construction_award.label_tag }}{{ f.act.actual_construction_award }}{{ f.act.actual_construction_award.errors }}</p>
         <p>{{ f.act.actual_substantial.label_tag }}{{ f.act.actual_substantial }}{{ f.act.actual_substantial.errors }}</p>
         <p>{{ f.act.actual_closeout.label_tag }}{{ f.act.actual_closeout }}{{ f.act.actual_closeout.errors }}</p>

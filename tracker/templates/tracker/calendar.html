@@ -18,7 +18,9 @@
 .chip.upcoming .st{color:var(--c)}
 .mark{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;font-size:9px;font-weight:800;color:#fff;vertical-align:-3px;margin-right:4px}
 .mark.done{background:var(--good)} .mark.missed{background:var(--crit)}
-.k-design{--c:var(--s1)} .k-award{--c:var(--s2)} .k-substantial{--c:var(--s3)} .k-closeout{--c:var(--s4)}
+.k-design{--c:var(--s1)} .k-award{--c:var(--s2)} .k-substantial{--c:var(--s3)} .k-closeout{--c:var(--s4)} .k-tender{--c:var(--s5)}
+.agenda .dot{background:var(--c)}
+.agenda .tender-tick{margin-top:4px;display:block}
 .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .fchip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-weight:500}
 .fchip i{width:9px;height:9px;border-radius:3px;background:var(--c)}
@@ -69,7 +71,7 @@
             <a class="chip k-{{ e.key }} {{ e.css }}" href="/projects/{{ e.project.pk }}/"
                data-tip="{{ e.label }} — {{ e.project.io_number }}
 {{ e.project.title }}
-{% if e.done %}✓ Actual {{ e.actual }}{% elif e.forecast %}Forecast {{ e.forecast }}{% else %}Approved {{ e.approved }} (no forecast){% endif %}{% if e.approved %}
+{% if e.done %}✓ Actual {{ e.actual }}{% elif e.is_deadline %}Deadline {{ e.forecast }} (design end + 30 days){% elif e.forecast %}Forecast {{ e.forecast }}{% else %}Approved {{ e.approved }} (no forecast){% endif %}{% if e.approved %}
 Approved (PCCF): {{ e.approved }}{% endif %}{% if e.slip_days %}
 {% if e.slip_days > 0 %}{{ e.slip_days }} days later than approved{% else %}{% widthratio e.slip_days 1 -1 %} days earlier than approved{% endif %}{% endif %}{% if e.css == 'missed' %}
 ✗ No actual date recorded{% endif %}">
@@ -92,8 +94,9 @@ Approved (PCCF): {{ e.approved }}{% endif %}{% if e.slip_days %}
       <div class="panel-head"><h2>Next 120 days</h2><span class="spacer"></span><span class="pill blue">{{ upcoming|length }}</span></div>
       {% for e in upcoming %}
         <div class="row"><div class="when">{{ e.date|date:"M j, Y" }}<div class="muted" style="font-weight:400">in {{ e.date|timeuntil:today }}</div></div>
-          <div style="min-width:0"><span class="dot" style="background:var(--{% if e.key == 'design' %}s1{% elif e.key == 'award' %}s2{% elif e.key == 'substantial' %}s3{% else %}s4{% endif %})"></span>
-            {{ e.label }}<br><a href="/projects/{{ e.project.pk }}/" class="ink2" style="font-size:12.5px">{{ e.project.io_number }} · {{ e.project.title|truncatechars:32 }}</a></div></div>
+          <div style="min-width:0"><span class="dot k-{{ e.key }}"></span>
+            {{ e.label }}<br><a href="/projects/{{ e.project.pk }}/" class="ink2" style="font-size:12.5px">{{ e.project.io_number }} · {{ e.project.title|truncatechars:32 }}</a>
+            {% if e.is_deadline %}{% include "tracker/_tender_tick.html" with e=e next=request.get_full_path %}{% endif %}</div></div>
       {% empty %}<p class="muted">Nothing scheduled. Update forecast dates on a project's MPSR tab to fill the calendar.</p>{% endfor %}
     </div>
     <div class="panel agenda">
@@ -101,8 +104,9 @@ Approved (PCCF): {{ e.approved }}{% endif %}{% if e.slip_days %}
       <p class="muted" style="margin-top:-6px;font-size:12.5px">Date has passed on an active or on-hold project with no actual date. Enter the actual date, or move the forecast.</p>
       {% for e in overdue %}
         <div class="row"><div class="when"><span class="mark missed">✗</span>{{ e.date|date:"M j, Y" }}</div>
-          <div style="min-width:0"><span class="dot" style="background:var(--{% if e.key == 'design' %}s1{% elif e.key == 'award' %}s2{% elif e.key == 'substantial' %}s3{% else %}s4{% endif %})"></span>
-            {{ e.label }}<br><a href="/projects/{{ e.project.pk }}/?tab=mpsr" class="ink2" style="font-size:12.5px">{{ e.project.io_number }} · {{ e.project.title|truncatechars:32 }}</a></div></div>
+          <div style="min-width:0"><span class="dot k-{{ e.key }}"></span>
+            {{ e.label }}<br><a href="/projects/{{ e.project.pk }}/?tab=mpsr" class="ink2" style="font-size:12.5px">{{ e.project.io_number }} · {{ e.project.title|truncatechars:32 }}</a>
+            {% if e.is_deadline %}{% include "tracker/_tender_tick.html" with e=e next=request.get_full_path %}{% endif %}</div></div>
       {% empty %}<p class="muted">Nothing overdue.</p>{% endfor %}
     </div>
   </div>

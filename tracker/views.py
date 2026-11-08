@@ -111,8 +111,8 @@ def overview(request):
 
 # ------------------------------------------------------------------ calendar
 
-MILESTONE_KEYS = {"design": "Design end", "award": "Construction award", "substantial": "Substantial",
-                  "closeout": "Closeout"}
+MILESTONE_KEYS = {"design": "Design end", "tender": "Go to tender", "award": "Construction award",
+                  "substantial": "Substantial", "closeout": "Closeout"}
 
 
 def calendar_view(request):
@@ -317,6 +317,35 @@ def project_update(request, pk, section):
             else:
                 messages.error(request, f"Not saved: {form.errors.as_text()}")
     return redirect(f"/projects/{pk}/?tab=mpsr")
+
+
+@require_POST
+def tender_tick(request, pk):
+    """Tick (or untick) the 'Go to tender' milestone. Ticking records today's date; edit it under actual dates."""
+    project = get_object_or_404(Project, pk=pk)
+    status, _ = ProjectStatus.objects.get_or_create(project=project)
+    nxt = request.POST.get("next", "")
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = f"/projects/{pk}/?tab=mpsr"
+    if request.POST.get("action") == "undo":
+        if status.actual_tender:
+            with transaction.atomic():
+                status.actual_tender = None
+                status.save(update_fields=["actual_tender"])
+                _log(project, StatusHistory.Kind.ACTUALS, text="Tender un-ticked", data={"actual_tender": None})
+            messages.success(request, f"{project.io_number}: tender marked as not issued")
+        return redirect(nxt)
+    if not status.actual_design_end:
+        messages.error(request, "Record the actual design end before ticking the tender.")
+        return redirect(nxt)
+    today = timezone.localdate()
+    with transaction.atomic():
+        status.actual_tender = max(today, status.actual_design_end)
+        status.save(update_fields=["actual_tender"])
+        _log(project, StatusHistory.Kind.ACTUALS, text=f"Tender issued {status.actual_tender}",
+             data={"actual_tender": status.actual_tender.isoformat()})
+    messages.success(request, f"{project.io_number}: tender issued {status.actual_tender}")
+    return redirect(nxt)
 
 
 def project_form(request, pk=None):

@@ -797,3 +797,82 @@ class HostingTests(TestCase):
         for url in ("/", "/projects/", "/mpsr/", "/calendar/", "/pos/", "/invoices/", "/change-orders/",
                     "/vendors/", "/facilities/"):
             self.assertEqual(self.client.get(url).status_code, 200, url)
+
+
+class TenderMilestoneTests(Base):
+    def _status(self, **kw):
+        st, _ = ProjectStatus.objects.get_or_create(project=self.p)
+        for k, v in kw.items():
+            setattr(st, k, v)
+        st.save()
+        return st
+
+    def _tender(self):
+        fresh = Project.objects.get(pk=self.p.pk)        # reload, as each page request does
+        return next((e for e in milestones([fresh]) if e.key == "tender"), None)
+
+    def test_no_tender_until_design_actually_ends(self):
+        self._status(design_end=dt.date(2026, 5, 1))                # forecast only
+        self.assertIsNone(self._tender())
+
+    def test_deadline_is_30_days_after_actual_design_end_and_follows_changes(self):
+        st = self._status(actual_design_end=dt.date(2026, 3, 10))
+        self.assertEqual(self._tender().forecast, dt.date(2026, 4, 9))
+        st.actual_design_end = dt.date(2026, 4, 1)                  # design end corrected later
+        st.save()
+        self.assertEqual(self._tender().forecast, dt.date(2026, 5, 1))
+        r = self.client.post(f"/projects/{self.p.pk}/update/act/", {
+            "act-actual_design_end": "2026-04-20", "act-stage": ""})
+        self.assertEqual(self._tender().forecast, dt.date(2026, 5, 20))
+
+    def test_open_tender_past_deadline_is_overdue(self):
+        from django.utils import timezone
+        today = timezone.localdate()
+        self._status(actual_design_end=today - dt.timedelta(days=45))
+        e = self._tender()
+        self.assertEqual((e.state(today), e.overdue(today), e.late_days), ("missed", True, 15))
+
+    def test_tick_and_untick(self):
+        from django.utils import timezone
+        today = timezone.localdate()
+        self._status(actual_design_end=today - dt.timedelta(days=5))
+        r = self.client.post(f"/projects/{self.p.pk}/tender/", {"action": "done", "next": "/calendar/"})
+        self.assertRedirects(r, "/calendar/", fetch_redirect_response=False)
+        e = self._tender()
+        self.assertEqual((e.done, e.actual, e.state(today)), (True, today, "done"))
+        self.assertTrue(self.p.status_history.filter(text__startswith="Tender issued").exists())
+        self.client.post(f"/projects/{self.p.pk}/tender/", {"action": "undo"})
+        self.assertFalse(self._tender().done)
+
+    def test_cannot_tick_without_design_end_or_redirect_offsite(self):
+        self._status()
+        r = self.client.post(f"/projects/{self.p.pk}/tender/", {"action": "done", "next": "https://evil.example/"})
+        self.assertRedirects(r, f"/projects/{self.p.pk}/?tab=mpsr", fetch_redirect_response=False)
+        self.assertIsNone(ProjectStatus.objects.get(project=self.p).actual_tender)
+
+    def test_award_means_tender_happened(self):
+        from django.utils import timezone
+        today = timezone.localdate()
+        self._status(actual_design_end=today - dt.timedelta(days=200),
+                     actual_construction_award=today - dt.timedelta(days=100))
+        e = self._tender()
+        self.assertEqual((e.done, e.overdue(today), e.late_days), (True, False, None))
+        self.assertContains(self.client.get(f"/projects/{self.p.pk}/"), "done (construction awarded)")
+
+    def test_tender_date_must_follow_design_end(self):
+        from .forms import ActualsForm
+        st = self._status()
+        f = ActualsForm({"actual_tender": "2026-03-01"}, instance=st)
+        self.assertIn("actual_tender", f.errors)
+        f = ActualsForm({"actual_design_end": "2026-03-10", "actual_tender": "2026-03-01"}, instance=st)
+        self.assertIn("before the actual design end", str(f.errors))
+        f = ActualsForm({"actual_design_end": "2026-03-10", "actual_tender": "2026-03-20"}, instance=st)
+        self.assertTrue(f.is_valid(), f.errors)
+
+    def test_pages_show_tender(self):
+        from django.utils import timezone
+        self._status(actual_design_end=timezone.localdate() - dt.timedelta(days=3))
+        for url in (f"/projects/{self.p.pk}/", f"/mpsr/{self.p.pk}/", "/calendar/?type=tender", "/"):
+            r = self.client.get(url)
+            self.assertContains(r, "Go to tender", msg_prefix=url)
+            self.assertContains(r, "Mark tendered", msg_prefix=url)

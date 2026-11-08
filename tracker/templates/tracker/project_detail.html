@@ -99,13 +99,19 @@
     </div>
     {% for t in timeline %}
       <div class="row">
+        {% if t.e.is_deadline %}
+        <div class="name">{{ t.e.label }}<small>{% if t.e.actual %}<span style="color:var(--good-ink);font-weight:700">✓</span> issued {{ t.e.actual }}{% elif t.e.done %}<span style="color:var(--good-ink);font-weight:700">✓</span> done (construction awarded){% elif t.e.css == 'missed' %}<span style="color:var(--crit-ink);font-weight:700">✗</span> deadline passed {{ t.e.forecast }}{% else %}deadline {{ t.e.forecast }}{% endif %}</small>
+          <small>30 days after design end {{ status.actual_design_end }}{% if t.e.late_days %} · <span class="neg">{{ t.e.late_days }} day{{ t.e.late_days|pluralize }} late</span>{% endif %}</small>
+          <div style="margin-top:4px">{% include "tracker/_tender_tick.html" with e=t.e next=request.get_full_path %}</div></div>
+        {% else %}
         <div class="name">{{ t.e.label }}<small>{% if t.e.done %}<span style="color:var(--good-ink);font-weight:700">✓</span> done {{ t.e.actual }}{% elif t.e.css == 'missed' %}<span style="color:var(--crit-ink);font-weight:700">✗</span> no actual date (due {{ t.e.date }}){% else %}due {{ t.e.date }}{% endif %}</small>{% if t.e.slip_days %}<small>{% if t.e.slip_days > 0 %}{{ t.e.slip_days }} days late vs approved{% else %}{% widthratio t.e.slip_days 1 -1 %} days early vs approved{% endif %}</small>{% endif %}</div>
+        {% endif %}
         <div class="lane">
           {% if t.link_width %}<div class="link" style="left:{{ t.link_left|floatformat:"2u" }}%;width:{{ t.link_width|floatformat:"2u" }}%"></div>{% endif %}
           {% if t.approved != None %}<span class="m ap" style="left:{{ t.approved|floatformat:"2u" }}%" data-tip="{{ t.e.label }}
 Approved (PCCF {{ fin.pccf.submission }}): {{ t.e.approved }}"></span>{% endif %}
-          {% if t.forecast != None %}<span class="m fc {% if t.e.css == 'missed' %}missed{% endif %}" style="left:{{ t.forecast|floatformat:"2u" }}%" data-tip="{{ t.e.label }}
-Forecast: {{ t.e.forecast }}{% if t.e.css == 'missed' %}
+          {% if t.forecast != None %}<span class="m fc {% if t.e.css == 'missed' %}missed{% endif %}" style="left:{{ t.forecast|floatformat:"2u" }}%{% if t.e.is_deadline and t.e.css != 'missed' %};background:var(--s5){% endif %}" data-tip="{{ t.e.label }}
+{% if t.e.is_deadline %}Deadline{% else %}Forecast{% endif %}: {{ t.e.forecast }}{% if t.e.css == 'missed' %}
 ✗ Passed with no actual date{% endif %}">{% if t.e.css == 'missed' %}✗{% endif %}</span>{% endif %}
           {% if t.actual != None %}<span class="m ac" style="left:{{ t.actual|floatformat:"2u" }}%" data-tip="{{ t.e.label }}
 Actual: {{ t.e.actual }}">✓</span>{% endif %}

@@ -10,7 +10,7 @@
   --page:#f4f5f2; --surface:#fcfcfb; --surface-2:#f4f3ef; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
   --line:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
   --accent:#2a78d6; --accent-ink:#1c5cab; --accent-soft:#e6effb;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
   --seq-1:#1c5cab; --seq-2:#5598e7; --seq-3:#9ec5f4; --track:#eceae4;
   --good:#0ca30c; --good-ink:#006300; --good-soft:#e8f6e8;
   --warn:#fab219; --warn-ink:#7a5200; --warn-soft:#fff6e0;
@@ -23,7 +23,7 @@
     --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
     --line:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
     --accent:#3987e5; --accent-ink:#86b6ef; --accent-soft:#16263a;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
     --seq-1:#6da7ec; --seq-2:#2a78d6; --seq-3:#184f95; --track:#2c2c2a;
     --good-ink:#0ca30c; --good-soft:#132a13; --warn-ink:#fab219; --warn-soft:#2e2510;
     --crit-ink:#e66767; --crit-soft:#331717; --nav:#111827; --nav-ink:#9aa6c1;
@@ -195,6 +195,14 @@ input.date-bad{border-color:var(--crit);background:var(--crit-soft);color:var(--
 .btn.danger{background:var(--crit);border-color:var(--crit);color:#fff}
 .btn.danger:hover{filter:brightness(.93)}
 .btn.ghost-danger{color:var(--crit-ink)}
+.tender-tick{display:inline-block;margin:0}
+.tick{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:7px;
+      padding:3px 9px 3px 5px;font:inherit;font-size:12.5px;font-weight:500;color:var(--ink);cursor:pointer;white-space:nowrap}
+.tick:hover{border-color:var(--good)}
+.tick .box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--axis);display:inline-grid;place-items:center;
+           font-size:10px;font-weight:800;color:#fff}
+.tick.on{background:var(--good-soft);border-color:transparent;color:var(--good-ink)}
+.tick.on .box{background:var(--good);border-color:var(--good)}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--accent-ink);cursor:pointer}
 .linkbtn.del{color:var(--crit-ink)}
 .rowacts{white-space:nowrap;font-size:12.5px;display:flex;gap:10px;align-items:center}

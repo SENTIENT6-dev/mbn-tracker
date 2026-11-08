@@ -102,8 +102,9 @@ Current forecast: {{ q.forecast|money }}"><div class="b a" style="height:{{ q.a_
         <div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center">
           <div style="width:46px;text-align:center;flex:none"><div style="font-size:11px;color:var(--ink-2);font-weight:600">{{ e.date|date:"M"|upper }}</div>
             <div style="font-size:19px;font-weight:650;line-height:1.1">{{ e.date|date:"j" }}</div></div>
-          <div style="min-width:0"><div><span class="dot" style="background:var(--{% if e.key == 'design' %}s1{% elif e.key == 'award' %}s2{% elif e.key == 'substantial' %}s3{% else %}s4{% endif %})"></span> {{ e.label }}</div>
+          <div style="min-width:0;flex:1"><div><span class="dot" style="background:var(--{% if e.key == 'design' %}s1{% elif e.key == 'tender' %}s5{% elif e.key == 'award' %}s2{% elif e.key == 'substantial' %}s3{% else %}s4{% endif %})"></span> {{ e.label }}{% if e.is_deadline %} <span class="muted" style="font-size:12px">· deadline</span>{% endif %}</div>
             <a href="/projects/{{ e.project.pk }}/" class="ink2" style="font-size:12.5px">{{ e.project.io_number }} · {{ e.project.title|truncatechars:34 }}</a></div>
+          {% if e.is_deadline %}{% include "tracker/_tender_tick.html" with e=e next=request.get_full_path %}{% endif %}
         </div>
       {% empty %}<p class="muted">No milestones in the next 90 days. Forecast dates are updated on each project's MPSR tab.</p>{% endfor %}
     </div>

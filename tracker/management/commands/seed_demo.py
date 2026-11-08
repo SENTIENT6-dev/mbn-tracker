@@ -149,6 +149,8 @@ class Command(BaseCommand):
             for field, done in (("design_end", 9), ("construction_award", 12), ("substantial", 25), ("closeout", 31)):
                 if age >= done and rnd.random() < .85:
                     setattr(ps, "actual_" + field, add_months(start, done - 1))
+            if ps.actual_design_end and age >= 11:          # tendered, some on time and some late
+                ps.actual_tender = ps.actual_design_end + dt.timedelta(days=rnd.choice([12, 21, 28, 41]))
             ps.save()
 
             # consultant PO, plus a contractor PO once tendered

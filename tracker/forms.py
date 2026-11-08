@@ -574,9 +574,9 @@ class VOWForm(DateFieldsMixin, forms.Form):
     """Same inputs as the MPSR form: previous-years VOW (with fees) and this year's VOW (no fees)."""
     reporting_date = forms.DateField()
     previous_years_with_fees = forms.DecimalField(max_digits=14, decimal_places=2,
-                                                  help_text="Previous fiscal years' VOW including fees")
+                                                  help_text="All earlier fiscal years")
     current_year_no_fees = forms.DecimalField(max_digits=14, decimal_places=2,
-                                              help_text="This fiscal year's VOW, excluding fees")
+                                              help_text="This fiscal year only")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

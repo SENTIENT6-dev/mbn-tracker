@@ -114,7 +114,11 @@ tr.mpsr-done td{background:color-mix(in srgb, var(--good-soft) 45%, transparent)
 table.compact th,table.compact td{padding:6px 6px;font-size:12.5px}
 .mpsr-form .panel{margin-bottom:12px}
 .mpsr-form textarea{min-height:96px}
-.mpsr-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 12px;align-items:end}
+/* MPSR field rows: labels get the same height (text sits at the bottom), so every box lines up and help text hangs below */
+.mpsr-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 12px;align-items:start}
+.mpsr-row p > label:first-child{min-height:2.6em;display:flex !important;align-items:flex-end;line-height:1.3}
+.mpsr-row .helptext{margin-top:3px;line-height:1.35}
+.mpsr-row .check{align-self:end}
 .mpsr-row.q{grid-template-columns:repeat(6,minmax(0,1fr));margin-top:8px}
 @media (max-width:900px){.mpsr-row.q{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .mpsr-row p{margin:0 0 6px} .mpsr-row label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:3px;font-weight:500}

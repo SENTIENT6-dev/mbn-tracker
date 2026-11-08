@@ -6,7 +6,9 @@
     <button class="tick on" name="action" value="undo" title="Tender issued {{ e.actual }}. Click to undo" aria-pressed="true">
       <span class="box">✓</span>Tendered</button>
   {% else %}
-    <button class="tick" name="action" value="done" title="Mark tender as issued today" aria-pressed="false">
+    <button class="tick" name="action" value="done" title="Mark tender as issued" aria-pressed="false"
+            data-tender-confirm="{{ e.project.io_number }} · {{ e.project.title|truncatechars:60 }}"
+            data-deadline="{{ e.forecast|date:'Y-m-d' }}" data-min="{{ e.design_end|date:'Y-m-d' }}">
       <span class="box"></span>Mark tendered</button>
   {% endif %}
 </form>

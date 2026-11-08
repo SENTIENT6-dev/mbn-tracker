@@ -339,12 +339,25 @@ def tender_tick(request, pk):
         messages.error(request, "Record the actual design end before ticking the tender.")
         return redirect(nxt)
     today = timezone.localdate()
+    issued = max(today, status.actual_design_end)
+    if request.POST.get("date"):                      # date picked in the confirm box
+        try:
+            issued = date.fromisoformat(request.POST["date"])
+        except ValueError:
+            messages.error(request, "Not saved: that tender date isn't a valid date.")
+            return redirect(nxt)
+        if issued < status.actual_design_end or issued > today:
+            messages.error(request, f"Not saved: the tender date must be between the design end "
+                                    f"({status.actual_design_end}) and today.")
+            return redirect(nxt)
     with transaction.atomic():
-        status.actual_tender = max(today, status.actual_design_end)
+        status.actual_tender = issued
         status.save(update_fields=["actual_tender"])
-        _log(project, StatusHistory.Kind.ACTUALS, text=f"Tender issued {status.actual_tender}",
-             data={"actual_tender": status.actual_tender.isoformat()})
-    messages.success(request, f"{project.io_number}: tender issued {status.actual_tender}")
+        _log(project, StatusHistory.Kind.ACTUALS, text=f"Tender issued {issued}",
+             data={"actual_tender": issued.isoformat()})
+    # the message at the top of the next page gets an Undo button (see base.html)
+    messages.success(request, f"{project.io_number}: tender marked as issued {issued}",
+                     extra_tags=f"undo-tender-{project.pk}")
     return redirect(nxt)
 
 

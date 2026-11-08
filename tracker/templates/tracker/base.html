@@ -234,7 +234,18 @@ label.required::after,.req{content:" *";color:var(--crit-ink);font-weight:700}
 .pill.over,.pill.high,.pill.overdue,.pill.crit{background:var(--crit-soft);color:var(--crit-ink)}
 .pill.low,.pill.none{background:var(--surface-2);color:var(--muted)}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
-.msg{padding:11px 14px;border-radius:10px;margin-bottom:14px;background:var(--good-soft);color:var(--good-ink);font-weight:500}
+.msg{padding:11px 14px;border-radius:10px;margin-bottom:14px;background:var(--good-soft);color:var(--good-ink);font-weight:500;
+     display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.msg > span{flex:1;min-width:0}
+.msg-undo{margin:0} .msg-undo .btn{background:var(--surface)}
+/* confirm box for marking a tender issued */
+dialog.confirm{border:0;border-radius:14px;padding:0;width:min(420px,calc(100vw - 32px));background:var(--surface);color:var(--ink);
+               box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog.confirm::backdrop{background:rgba(10,14,24,.45)}
+dialog.confirm form{padding:22px;display:flex;flex-direction:column;gap:12px}
+dialog.confirm h2{margin:0;font-size:17px}
+dialog.confirm p{margin:0;color:var(--ink-2);font-size:13.5px}
+dialog.confirm .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
 .msg.error{background:var(--crit-soft);color:var(--crit-ink)}
 .banner{padding:11px 14px;border-radius:10px;margin-bottom:16px;background:var(--warn-soft);color:var(--warn-ink)}
 /* ---------- tabs */
@@ -331,10 +342,66 @@ details>summary::-webkit-details-marker{display:none}
   {% endwith %}
 </aside>
 <main>
-  {% for m in messages %}<div class="msg {% if m.tags == 'error' %}error{% endif %}">{{ m }}</div>{% endfor %}
+  {% for m in messages %}<div class="msg {% if m.level_tag == 'error' %}error{% endif %}" role="status">
+    <span>{{ m }}</span>
+    {% if "undo-tender-" in m.extra_tags %}
+    <form method="post" action="/projects/{{ m.extra_tags|cut:'undo-tender-' }}/tender/" class="msg-undo">{% csrf_token %}
+      <input type="hidden" name="action" value="undo"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button class="btn small">Undo</button></form>
+    {% endif %}</div>{% endfor %}
   {% block content %}{% endblock %}
 </main>
 <div id="tip" role="tooltip"></div>
+<dialog class="confirm" id="tender-confirm" aria-labelledby="tc-title">
+  <form method="dialog">
+    <h2 id="tc-title">Mark tender as issued?</h2>
+    <p id="tc-project"></p>
+    <p id="tc-deadline"></p>
+    <label for="tc-date" style="font-size:13px;font-weight:600">Date the tender went out</label>
+    <input type="date" id="tc-date" required>
+    <div class="acts">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" value="ok" id="tc-ok">Mark tendered</button>
+    </div>
+  </form>
+</dialog>
+<script>
+// "Mark tendered" asks for confirmation (and the date) in a pop-up before saving.
+(function(){
+  const dlg = document.getElementById('tender-confirm');
+  if (!dlg || !dlg.showModal) return;          // very old browser: the button just submits
+  const dateIn = document.getElementById('tc-date');
+  let pending = null;
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button[data-tender-confirm]');
+    if (!b) return;
+    e.preventDefault();
+    pending = b.form;
+    const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+    const iso = today.toISOString().slice(0, 10);
+    document.getElementById('tc-project').textContent = b.dataset.tenderConfirm;
+    const late = b.dataset.deadline < iso;
+    document.getElementById('tc-deadline').textContent =
+      'Deadline ' + b.dataset.deadline + (late ? ' (passed)' : '') + ' · design ended ' + b.dataset.min;
+    dateIn.min = b.dataset.min; dateIn.max = iso; dateIn.value = iso < b.dataset.min ? b.dataset.min : iso;
+    dlg.returnValue = '';
+    dlg.showModal();
+    dateIn.focus();
+  });
+  dlg.addEventListener('close', () => {
+    if (dlg.returnValue === 'ok' && pending && dateIn.value) {
+      const f = pending;
+      for (const [n, v] of [['action', 'done'], ['date', dateIn.value]]) {
+        let i = f.querySelector(`input[name="${n}"]`);
+        if (!i) { i = document.createElement('input'); i.type = 'hidden'; i.name = n; f.appendChild(i); }
+        i.value = v;
+      }
+      f.submit();
+    }
+    pending = null;
+  });
+})();
+</script>
 <script>
 // Searchable drop-downs: any form select with more than 12 options gets a type-to-filter box.
 // The real <select> stays in the page (hidden) and keeps the value that gets saved.

@@ -897,3 +897,42 @@ class IONPOTests(Base):
         self.assertContains(r, "PO ION00555 already exists")
         self.assertEqual(PurchaseOrder.objects.filter(number="ION00555").count(), 1)
         self.assertEqual(po.vendor, self.arch)
+
+
+class TenderConfirmTests(Base):
+    def setUp(self):
+        super().setUp()
+        from django.utils import timezone
+        self.today = timezone.localdate()
+        self.st, _ = ProjectStatus.objects.get_or_create(project=self.p)
+        self.st.actual_design_end = self.today - dt.timedelta(days=20)
+        self.st.save()
+
+    def test_confirm_box_data_and_chosen_date(self):
+        r = self.client.get(f"/projects/{self.p.pk}/")
+        self.assertContains(r, 'data-tender-confirm="')
+        self.assertContains(r, f'data-min="{self.st.actual_design_end:%Y-%m-%d}"')
+        self.assertContains(r, 'id="tender-confirm"')
+        picked = self.today - dt.timedelta(days=4)
+        r = self.client.post(f"/projects/{self.p.pk}/tender/", {"action": "done", "date": picked.isoformat()},
+                             follow=True)
+        self.st.refresh_from_db()
+        self.assertEqual(self.st.actual_tender, picked)
+        self.assertContains(r, f"tender marked as issued {picked}")
+        self.assertContains(r, f'action="/projects/{self.p.pk}/tender/" class="msg-undo"')   # Undo next to message
+
+    def test_undo_from_message(self):
+        self.client.post(f"/projects/{self.p.pk}/tender/", {"action": "done"}, follow=True)   # message shown
+        r = self.client.post(f"/projects/{self.p.pk}/tender/", {"action": "undo", "next": "/calendar/"}, follow=True)
+        self.st.refresh_from_db()
+        self.assertIsNone(self.st.actual_tender)
+        self.assertContains(r, "tender marked as not issued")
+        self.assertNotContains(r, 'class="msg-undo"')
+
+    def test_bad_dates_are_refused(self):
+        for bad in ((self.today + dt.timedelta(days=1)).isoformat(),
+                    (self.st.actual_design_end - dt.timedelta(days=1)).isoformat(), "not-a-date"):
+            r = self.client.post(f"/projects/{self.p.pk}/tender/", {"action": "done", "date": bad}, follow=True)
+            self.assertContains(r, "Not saved", msg_prefix=bad)
+            self.st.refresh_from_db()
+            self.assertIsNone(self.st.actual_tender, bad)

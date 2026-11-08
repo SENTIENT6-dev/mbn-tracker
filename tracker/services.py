@@ -334,6 +334,11 @@ class Milestone:
         return self.key == "tender"
 
     @property
+    def design_end(self):
+        """Tender only: the actual design end its deadline is counted from."""
+        return self.forecast - timedelta(days=TENDER_DAYS) if self.is_deadline else None
+
+    @property
     def late_days(self):
         """Tender only: days the tender went out (or, if still open, today) is past its deadline."""
         if not self.is_deadline or (self.awarded and not self.actual):

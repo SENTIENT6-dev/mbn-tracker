@@ -1,0 +1,110 @@
+{% extends "tracker/base.html" %}
+{% block head %}
+<style>
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--ring);border-radius:12px;overflow:hidden;background:var(--surface)}
+.cal .dow{padding:8px 10px;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border-bottom:1px solid var(--line)}
+.cal .day{min-height:112px;padding:6px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px;min-width:0}
+.cal .day:nth-child(7n){border-right:0}
+.cal .day.out{background:var(--surface-2)} .cal .day.out .num{color:var(--muted)}
+.cal .num{font-size:12px;font-weight:600;color:var(--ink-2);padding:1px 4px;align-self:flex-start;border-radius:6px}
+.cal .day.today .num{background:var(--accent);color:#fff}
+.chip{display:flex;align-items:center;gap:5px;font-size:11.5px;line-height:1.3;padding:2px 6px;border-radius:5px;color:var(--ink);
+      background:var(--surface-2);border-left:3px solid var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip:hover{text-decoration:none;background:var(--accent-soft)}
+.chip .st{font-size:9px;flex:none;width:14px;height:14px;border-radius:50%;display:inline-grid;place-items:center;
+          font-weight:800;line-height:1;color:var(--muted)}
+.chip.done .st{background:var(--good);color:#fff}
+.chip.missed .st{background:var(--crit);color:#fff}
+.chip.upcoming .st{color:var(--c)}
+.mark{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;font-size:9px;font-weight:800;color:#fff;vertical-align:-3px;margin-right:4px}
+.mark.done{background:var(--good)} .mark.missed{background:var(--crit)}
+.k-design{--c:var(--s1)} .k-award{--c:var(--s2)} .k-substantial{--c:var(--s3)} .k-closeout{--c:var(--s4)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.fchip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-weight:500}
+.fchip i{width:9px;height:9px;border-radius:3px;background:var(--c)}
+.fchip.on{border-color:var(--c);color:var(--ink);box-shadow:inset 0 0 0 1px var(--c)}
+.fchip:hover{text-decoration:none}
+.agenda .row{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.agenda .when{width:96px;flex:none;font-size:12px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
+@media (max-width:760px){.cal .day{min-height:70px}.chip span.t{display:none}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ first|date:"F Y" }}</h1>
+    <div class="sub">{{ month_count }} milestone{{ month_count|pluralize }} this month{% if month_count %}:
+      {% if month_done %}<span class="mark done">✓</span>{{ month_done }} done {% endif %}
+      {% if month_missed %}<span class="mark missed">✗</span>{{ month_missed }} without actual date {% endif %}
+      {% if month_upcoming %}● {{ month_upcoming }} upcoming{% endif %}{% endif %}</div></div>
+  <span class="spacer"></span>
+  <div class="seg">
+    <a href="?m={{ prev }}&{{ qs }}" aria-label="Previous month">‹ Prev</a>
+    <a href="?m={{ this }}&{{ qs }}">Today</a>
+    <a href="?m={{ next }}&{{ qs }}" aria-label="Next month">Next ›</a>
+  </div>
+</div>
+
+<form method="get" class="filters" style="margin-bottom:14px">
+  <input type="hidden" name="m" value="{{ first|date:'Y-m' }}">
+  {% for k, label in kinds.items %}
+    <label class="fchip k-{{ k }} {% if k in selected %}on{% endif %}">
+      <input type="checkbox" name="type" value="{{ k }}" {% if k in selected %}checked{% endif %} onchange="this.form.submit()" style="display:none">
+      <i></i>{{ label }}</label>
+  {% endfor %}
+  <span style="flex:1"></span>
+  <select name="scope" onchange="this.form.submit()">
+    <option value="all" {% if scope == 'all' %}selected{% endif %}>All projects</option>
+    <option value="active" {% if scope == 'active' %}selected{% endif %}>Active &amp; on-hold projects</option>
+  </select>
+</form>
+
+<div class="grid g-main">
+  <div>
+    <div class="cal">
+      {% for d in "SMTWTFS" %}<div class="dow">{% cycle 'Sun' 'Mon' 'Tue' 'Wed' 'Thu' 'Fri' 'Sat' %}</div>{% endfor %}
+      {% for week in weeks %}{% for d in week %}
+        <div class="day {% if not d.in_month %}out{% endif %} {% if d.today %}today{% endif %}">
+          <span class="num">{{ d.date.day }}</span>
+          {% for e in d.events %}
+            <a class="chip k-{{ e.key }} {{ e.css }}" href="/projects/{{ e.project.pk }}/"
+               data-tip="{{ e.label }} — {{ e.project.io_number }}
+{{ e.project.title }}
+{% if e.done %}✓ Actual {{ e.actual }}{% elif e.forecast %}Forecast {{ e.forecast }}{% else %}Approved {{ e.approved }} (no forecast){% endif %}{% if e.approved %}
+Approved (PCCF): {{ e.approved }}{% endif %}{% if e.slip_days %}
+{% if e.slip_days > 0 %}{{ e.slip_days }} days later than approved{% else %}{% widthratio e.slip_days 1 -1 %} days earlier than approved{% endif %}{% endif %}{% if e.css == 'missed' %}
+✗ No actual date recorded{% endif %}">
+              <span class="st">{% if e.css == 'done' %}✓{% elif e.css == 'missed' %}✗{% else %}●{% endif %}</span>
+              <span>{{ e.project.io_number }}</span><span class="t ink2">{{ e.label }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% endfor %}{% endfor %}
+    </div>
+    <div class="legend" style="margin-top:10px">
+      <span><span class="mark done">✓</span>Done: actual date recorded</span>
+      <span><span class="mark missed">✗</span>Passed with no actual date</span>
+      <span>● Upcoming (forecast)</span>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel agenda">
+      <div class="panel-head"><h2>Next 120 days</h2><span class="spacer"></span><span class="pill blue">{{ upcoming|length }}</span></div>
+      {% for e in upcoming %}
+        <div class="row"><div class="when">{{ e.date|date:"M j, Y" }}<div class="muted" style="font-weight:400">in {{ e.date|timeuntil:today }}</div></div>
+          <div style="min-width:0"><span class="dot" style="background:var(--{% if e.key == 'design' %}s1{% elif e.key == 'award' %}s2{% elif e.key == 'substantial' %}s3{% else %}s4{% endif %})"></span>
+            {{ e.label }}<br><a href="/projects/{{ e.project.pk }}/" class="ink2" style="font-size:12.5px">{{ e.project.io_number }} · {{ e.project.title|truncatechars:32 }}</a></div></div>
+      {% empty %}<p class="muted">Nothing scheduled. Update forecast dates on a project's MPSR tab to fill the calendar.</p>{% endfor %}
+    </div>
+    <div class="panel agenda">
+      <div class="panel-head"><h2>Overdue on active projects</h2><span class="spacer"></span><span class="pill overdue">✗ {{ overdue|length }}</span></div>
+      <p class="muted" style="margin-top:-6px;font-size:12.5px">Date has passed on an active or on-hold project with no actual date. Enter the actual date, or move the forecast.</p>
+      {% for e in overdue %}
+        <div class="row"><div class="when"><span class="mark missed">✗</span>{{ e.date|date:"M j, Y" }}</div>
+          <div style="min-width:0"><span class="dot" style="background:var(--{% if e.key == 'design' %}s1{% elif e.key == 'award' %}s2{% elif e.key == 'substantial' %}s3{% else %}s4{% endif %})"></span>
+            {{ e.label }}<br><a href="/projects/{{ e.project.pk }}/?tab=mpsr" class="ink2" style="font-size:12.5px">{{ e.project.io_number }} · {{ e.project.title|truncatechars:32 }}</a></div></div>
+      {% empty %}<p class="muted">Nothing overdue.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

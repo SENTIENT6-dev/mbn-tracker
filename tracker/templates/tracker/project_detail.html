@@ -1,0 +1,278 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block title %}{{ project.io_number }} – MBN Tracker{% endblock %}
+{% block head %}
+<style>
+.stepper{display:flex;gap:4px;margin:4px 0 20px;overflow-x:auto}
+.stepper .s{flex:1;min-width:92px;text-align:center;font-size:12px;color:var(--muted);font-weight:500}
+.stepper .s::before{content:"";display:block;height:6px;border-radius:3px;background:var(--track);margin-bottom:6px}
+.stepper .s.done{color:var(--ink-2)} .stepper .s.done::before{background:var(--seq-2)}
+.stepper .s.current{color:var(--accent-ink);font-weight:700} .stepper .s.current::before{background:var(--accent);height:8px;margin-top:-1px}
+/* milestone timeline */
+.tl{position:relative;padding:22px 0 20px}
+.tl .row{display:grid;grid-template-columns:170px 1fr;align-items:center;min-height:56px;padding:6px 0;border-bottom:1px solid var(--line)}
+.tl .row .lane{height:44px}
+.tl .row:last-child{border-bottom:0}
+.tl .name{font-size:13px;font-weight:500}
+.tl .name small{display:block;font-weight:400;color:var(--muted);font-size:11.5px}
+.tl .lane{position:relative;height:100%}
+.tl .axis{position:absolute;left:170px;right:0;top:0;bottom:0;pointer-events:none}
+.tl .yr{position:absolute;top:0;bottom:0;border-left:1px dashed var(--line);font-size:11px;color:var(--muted);padding-left:4px}
+.tl .now{position:absolute;top:0;bottom:0;border-left:2px solid var(--crit);}
+.tl .now span{position:absolute;bottom:0;left:4px;font-size:11px;font-weight:600;color:var(--crit-ink);background:var(--surface);padding:0 3px}
+.tl .link{position:absolute;top:50%;height:2px;background:var(--axis);transform:translateY(-1px)}
+.tl .m{position:absolute;top:50%;transform:translate(-50%,-50%);border-radius:50%;cursor:default}
+.tl .m.ap{width:12px;height:12px;border:2px solid var(--muted);background:var(--surface)}
+.tl .m.fc{width:12px;height:12px;background:var(--s1);box-shadow:0 0 0 2px var(--surface)}
+.tl .m.fc.missed{width:16px;height:16px;background:var(--crit);color:#fff;font-size:10px;display:grid;place-items:center;font-weight:800}
+.tl .m.ac{width:16px;height:16px;background:var(--good);box-shadow:0 0 0 2px var(--surface);color:#fff;font-size:10px;display:grid;place-items:center;font-weight:700}
+/* cash flow columns */
+.cols{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;height:180px;align-items:end;padding:0 6px;border-bottom:1px solid var(--axis)}
+.cols .q{display:flex;gap:2px;align-items:end;height:100%;justify-content:center}
+.cols .b{width:30%;max-width:34px;border-radius:4px 4px 0 0;min-height:2px}
+.cols .b.a{background:var(--s1)} .cols .b.f{background:var(--s2)}
+.qlabels{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;padding:6px 6px 0;text-align:center;font-size:12px;color:var(--ink-2)}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="ink2" style="font-size:13px"><a href="/projects/">Projects</a> › {{ project.io_number }}</div>
+    <h1>{{ project.title }}</h1>
+    <div class="sub" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span class="pill {% if project.status == 1 %}blue{% endif %}">{{ project.get_status_display }}</span>
+      <span>IO {{ project.io_number }}</span>{% if project.bgis_number %}<span>· BGIS {{ project.bgis_number }}</span>{% endif %}
+      <span>· {% if project.building %}<a href="/facilities/buildings/{{ project.building_id }}/">{{ project.building }}</a>{% else %}Building {{ project.building_code|default:"–" }}{% endif %}</span>    </div>
+  </div>
+  <span class="spacer"></span>
+  <a class="btn ghost-danger" href="/projects/{{ project.pk }}/delete/">Delete</a>
+  <a class="btn" href="/projects/{{ project.pk }}/edit/">Edit details</a>
+  <a class="btn" href="/projects/{{ project.pk }}/pccf/new/">+ PCCF</a>
+  <a class="btn primary" href="/pos/new/?project={{ project.pk }}">+ PO</a>
+</div>
+
+{% if stepper %}
+<div class="stepper" aria-label="Project stage">
+  {% for s in stepper %}<div class="s {{ s.state }}">{{ s.name }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<div class="tiles">
+  <div class="tile"><div class="k">Budget incl. fee</div><div class="v">{{ fin.budget_with_fee|money }}</div><div class="d">PCCF {{ fin.pccf.submission|default:"–" }} · {{ fin.budget|money }} before fee</div></div>
+  <div class="tile"><div class="k">Committed</div><div class="v">{{ fin.commitments|money }}</div><div class="d">{{ pos|length }} PO{{ pos|length|pluralize }}{% if fin.pending %} + {{ fin.pending|money }} pending{% endif %}</div></div>
+  <div class="tile {% if fin.remaining_budget|neg %}alert{% endif %}"><div class="k">Uncommitted budget</div><div class="v">{{ fin.remaining_budget|money }}</div><div class="d">{% include "tracker/_health.html" with f=fin %}</div></div>
+  <div class="tile"><div class="k">Invoiced</div><div class="v">{{ fin.invoiced|money }}</div><div class="d">{{ fin.spent_percent|floatformat:0 }}% of budget</div></div>
+  <div class="tile"><div class="k">Value of work</div><div class="v">{{ fin.vow_total|money }}</div><div class="d">as of {{ fin.vow.reporting_date|default:"never" }}</div></div>
+  <div class="tile {% if fin.to_be_billed|neg %}alert{% endif %}"><div class="k">To be billed</div><div class="v">{{ fin.to_be_billed|money }}</div><div class="d">VOW minus invoiced</div></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>Budget used</h2><span class="spacer"></span>
+    <div class="legend"><span><i style="background:var(--seq-1)"></i>Invoiced {{ fin.invoiced|money }}</span>
+      <span><i style="background:var(--seq-2)"></i>Committed, not invoiced</span>{% if fin.pending %}<span><i class="lg-pen"></i>Pending COs {{ fin.pending|money }}</span>{% endif %}
+      {% if fin.over_amount %}<span><i class="lg-ovr"></i>Over budget</span>{% endif %}
+      <span class="muted">· full bar = budget {{ fin.budget|money }} (no fee)</span></div></div>
+  {% include "tracker/_budget_bar.html" with f=fin lg=True %}
+</div>
+
+{% for i in issues %}<div class="banner">{{ i.summary }} <a href="/issues/">Data issues</a></div>{% endfor %}
+{% if not has_charter %}<div class="banner">No charter (PCCF 0) on file for this project. It was set up before charters were required.
+  <a href="/projects/{{ project.pk }}/pccf/new/?charter=1">Add the charter</a></div>{% endif %}
+
+<div class="tabs">
+  <a href="?tab=mpsr" class="{% if tab == 'mpsr' %}on{% endif %}">Status &amp; schedule</a>
+  <a href="?tab=budget" class="{% if tab == 'budget' %}on{% endif %}">Budget &amp; PCCFs</a>
+  <a href="?tab=pos" class="{% if tab == 'pos' %}on{% endif %}">POs &amp; invoices ({{ pos|length }})</a>
+  <a href="?tab=history" class="{% if tab == 'history' %}on{% endif %}">History</a>
+</div>
+
+{% if tab == 'mpsr' %}
+<div class="panel">
+  <div class="panel-head"><h2>Milestones</h2><span class="spacer"></span>
+    <div class="legend"><span><i style="border:2px solid var(--muted);border-radius:50%;background:transparent"></i>Approved (PCCF)</span>
+      <span><i style="background:var(--s1);border-radius:50%"></i>Forecast</span><span><i style="background:var(--crit);border-radius:50%"></i>✗ Passed, no actual</span>
+      <span><i style="background:var(--good);border-radius:50%"></i>Actual</span></div></div>
+  {% if timeline %}
+  <div class="tl">
+    <div class="axis">
+      {% for y in years %}<div class="yr" style="left:{{ y.pos|floatformat:"2u" }}%">{{ y.label }}</div>{% endfor %}
+      <div class="now" style="left:{{ today_pos|floatformat:"2u" }}%"><span>Today</span></div>
+    </div>
+    {% for t in timeline %}
+      <div class="row">
+        <div class="name">{{ t.e.label }}<small>{% if t.e.done %}<span style="color:var(--good-ink);font-weight:700">✓</span> done {{ t.e.actual }}{% elif t.e.css == 'missed' %}<span style="color:var(--crit-ink);font-weight:700">✗</span> no actual date (due {{ t.e.date }}){% else %}due {{ t.e.date }}{% endif %}</small>{% if t.e.slip_days %}<small>{% if t.e.slip_days > 0 %}{{ t.e.slip_days }} days late vs approved{% else %}{% widthratio t.e.slip_days 1 -1 %} days early vs approved{% endif %}</small>{% endif %}</div>
+        <div class="lane">
+          {% if t.link_width %}<div class="link" style="left:{{ t.link_left|floatformat:"2u" }}%;width:{{ t.link_width|floatformat:"2u" }}%"></div>{% endif %}
+          {% if t.approved != None %}<span class="m ap" style="left:{{ t.approved|floatformat:"2u" }}%" data-tip="{{ t.e.label }}
+Approved (PCCF {{ fin.pccf.submission }}): {{ t.e.approved }}"></span>{% endif %}
+          {% if t.forecast != None %}<span class="m fc {% if t.e.css == 'missed' %}missed{% endif %}" style="left:{{ t.forecast|floatformat:"2u" }}%" data-tip="{{ t.e.label }}
+Forecast: {{ t.e.forecast }}{% if t.e.css == 'missed' %}
+✗ Passed with no actual date{% endif %}">{% if t.e.css == 'missed' %}✗{% endif %}</span>{% endif %}
+          {% if t.actual != None %}<span class="m ac" style="left:{{ t.actual|floatformat:"2u" }}%" data-tip="{{ t.e.label }}
+Actual: {{ t.e.actual }}">✓</span>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% else %}<p class="muted">No milestone dates yet.</p>{% endif %}
+  <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px">
+    <details><summary>Update forecast dates</summary>
+      <form method="post" action="/projects/{{ project.pk }}/update/dates/" class="stack cols" style="margin-top:10px;min-width:min(640px,80vw)">{% csrf_token %}
+        {{ dates_form.as_p }}<p class="full"><button class="btn primary">Save forecast dates</button></p></form></details>
+    <details><summary>Record actual dates &amp; stage</summary>
+      <form method="post" action="/projects/{{ project.pk }}/update/act/" class="stack cols" style="margin-top:10px;min-width:min(640px,80vw)">{% csrf_token %}
+        {{ actuals_form.as_p }}<p class="full"><button class="btn primary">Save actuals</button></p></form></details>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="panel">
+    <div class="panel-head"><h2>Cash flow{% if status.fiscal_year %} · FY {{ status.fiscal_year_label }}{% endif %}</h2><span class="spacer"></span>
+      <div class="legend"><span><i style="background:var(--s1)"></i>Approved (PCCF)</span><span><i style="background:var(--s2)"></i>Current forecast</span></div></div>
+    <div class="cols">
+      {% for q in quarters %}
+        <div class="q" data-tip="{{ q.label }}
+Approved: {{ q.approved|money }}
+Forecast: {{ q.forecast|money }}">
+          <div class="b a" style="height:{{ q.a_pct|floatformat:"2u" }}%"></div>
+          <div class="b f" style="height:{{ q.f_pct|floatformat:"2u" }}%"></div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="qlabels">{% for q in quarters %}<div>{{ q.label }}<div class="muted">{{ q.forecast|money }}</div></div>{% endfor %}</div>
+    <table style="margin-top:14px">
+      <thead><tr><th></th><th class="n">Previous yrs</th><th class="n">This year</th><th class="n">Next year</th><th class="n">Future</th></tr></thead>
+      <tbody>
+        {% if fin.pccf %}<tr><td class="ink2">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{{ fin.pccf.current_year_cash_flow|money }}</td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
+        <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n">{{ status.current_year_forecast|money }}</td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
+      </tbody>
+    </table>
+    <details style="margin-top:12px"><summary>Update forecast</summary>
+      <form method="post" action="/projects/{{ project.pk }}/update/cash/" class="stack cols" style="margin-top:10px">{% csrf_token %}
+        {{ cash_form.as_p }}<p class="full"><button class="btn primary">Save cash flow</button></p></form></details>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>Value of work</h2></div>
+    <dl class="kv">
+      <dt>Total to date (no fees)</dt><dd><strong>{{ fin.vow_total|money }}</strong></dd>
+      <dt>Previous years (no fees)</dt><dd>{{ fin.vow_previous|money }}</dd>
+      <dt>This fiscal year (no fees)</dt><dd>{{ fin.vow_current_year|money }}</dd>
+      <dt>Fees on VOW ({{ fin.fee_percent|floatformat:2 }}%)</dt><dd>{{ fin.vow_fees|money }}</dd>
+      <dt>Invoiced</dt><dd>{{ fin.invoiced|money }}</dd>
+      <dt>To be billed</dt><dd class="{% if fin.to_be_billed|neg %}neg{% endif %}">{{ fin.to_be_billed|money }}</dd>
+      <dt>Last reported</dt><dd>{{ fin.vow.reporting_date|default:"never" }}</dd>
+    </dl>
+    <details style="margin-top:14px"><summary>Record value of work</summary>
+      <form method="post" action="/projects/{{ project.pk }}/update/vow/" class="stack cols wide" style="margin-top:10px">{% csrf_token %}
+        {{ vow_form.as_p }}<p class="full"><button class="btn primary">Save VOW</button></p></form></details>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="panel">
+    <div class="panel-head"><h2>Status comment</h2></div>
+    <div class="pre" style="margin-bottom:12px">{{ status.comments|default:"No comment yet." }}</div>
+    <details><summary>Write a new comment</summary>
+      <form method="post" action="/projects/{{ project.pk }}/update/comment/" class="stack" style="margin-top:10px">{% csrf_token %}
+        {{ comment_form.as_p }}<button class="btn primary">Save comment</button></form></details>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Risk</h2></div>
+    <div class="pre" style="margin-bottom:12px">{{ status.risk|default:"No risk noted." }}</div>
+    <details><summary>Update risk</summary>
+      <form method="post" action="/projects/{{ project.pk }}/update/risk/" class="stack" style="margin-top:10px">{% csrf_token %}
+        {{ risk_form.as_p }}<button class="btn primary">Save risk</button></form></details>
+  </div>
+</div>
+
+{% elif tab == 'budget' %}
+<div class="grid g2">
+  <div class="panel">
+    <div class="panel-head"><h2>Current budget</h2><span class="spacer"></span>{% if fin.pccf %}<span class="pill">PCCF {{ fin.pccf.submission }} · {{ fin.pccf.date|default:"no date" }}</span>{% endif %}</div>
+    {% if fin.pccf %}
+    <table>
+      <thead><tr><th></th><th class="n">Budget</th><th class="n">Committed</th><th class="n">Contingency used</th></tr></thead>
+      <tbody>
+        <tr><td>Design</td><td class="n">{{ fin.pccf.design_cost|money }}</td><td class="n">{{ fin.consultant_commitments|money }}</td><td></td></tr>
+        <tr><td>Design contingency</td><td class="n">{{ fin.pccf.design_contingency|money }}</td><td></td><td class="n">{{ fin.used_design_contingency|money }}</td></tr>
+        <tr><td>Construction</td><td class="n">{{ fin.pccf.construction_cost|money }}</td><td class="n">{{ fin.contractor_commitments|money }}</td><td></td></tr>
+        <tr><td>Construction contingency</td><td class="n">{{ fin.pccf.construction_contingency|money }}</td><td></td><td class="n">{{ fin.used_construction_contingency|money }}</td></tr>
+        <tr class="total"><td>Subtotal (no fee)</td><td class="n">{{ fin.budget|money }}</td><td class="n">{{ fin.commitments|money }}</td><td></td></tr>
+        <tr><td>Fee ({{ fin.pccf.fee_percent|floatformat:2 }}%)</td><td class="n">{{ fin.pccf.fee|money }}</td><td></td><td></td></tr>
+        <tr class="total"><td>Total budget</td><td class="n">{{ fin.budget_with_fee|money }}</td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    {% else %}<p class="muted">No PCCF submission yet.</p>{% endif %}
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Approved schedule &amp; scope</h2></div>
+    {% if fin.pccf %}
+    <dl class="kv">
+      <dt>Charter approval</dt><dd>{{ fin.pccf.approval_date|default:"–" }}</dd>
+      <dt>Design start</dt><dd>{{ fin.pccf.design_start|default:"–" }}</dd>
+      <dt>Design end</dt><dd>{{ fin.pccf.design_end|default:"–" }}</dd>
+      <dt>Construction award</dt><dd>{{ fin.pccf.construction_award|default:"–" }}</dd>
+      <dt>Substantial performance</dt><dd>{{ fin.pccf.substantial|default:"–" }}</dd>
+      <dt>Closeout</dt><dd>{{ fin.pccf.closeout|default:"–" }}</dd>
+    </dl>
+    {% if fin.pccf.notes %}<h3 style="margin-top:14px">Notes (PCCF {{ fin.pccf.submission }})</h3><div class="pre">{{ fin.pccf.notes }}</div>{% endif %}
+    {% endif %}
+  </div>
+</div>
+<div class="panel-head"><h2>PCCF submissions</h2><span class="spacer"></span><a class="btn primary" href="/projects/{{ project.pk }}/pccf/new/">+ New PCCF submission</a></div>
+<div class="tablewrap"><table>
+  <thead><tr><th>#</th><th>Date</th><th>FY</th><th class="n">Design</th><th class="n">Design cont.</th><th class="n">Construction</th>
+    <th class="n">Constr. cont.</th><th class="n">Fee</th><th class="n">Total</th><th class="n">Change</th><th>Notes</th><th></th></tr></thead>
+  <tbody>{% for p in pccfs %}
+    <tr><td class="nowrap"><strong>{{ p.submission }}</strong>{% if p.submission == 0 %} <span class="pill blue">Charter</span>{% endif %}{% if p.final %} <span class="pill ok">final</span>{% endif %}</td><td>{{ p.date|default:"–" }}</td><td class="nowrap">{{ p.fiscal_year_label }}</td>
+      <td class="n">{{ p.design_cost|money }}</td><td class="n">{{ p.design_contingency|money }}</td><td class="n">{{ p.construction_cost|money }}</td>
+      <td class="n">{{ p.construction_contingency|money }}</td><td class="n">{{ p.fee|money }}</td><td class="n"><strong>{{ p.total_budget|money }}</strong></td>
+      <td class="n">{% if p.change %}<span class="{% if p.change|neg %}neg{% endif %}">{% if not p.change|neg %}+{% endif %}{{ p.change|money }}</span>{% endif %}</td>
+      <td style="max-width:420px">{% if p.notes %}<details><summary style="font-weight:500">{{ p.notes|truncatechars:60 }}</summary><div class="pre" style="margin-top:6px;font-size:13px">{{ p.notes }}</div></details>{% endif %}</td>
+      <td><span class="rowacts"><a href="/projects/{{ project.pk }}/pccf/{{ p.pk }}/">Edit</a>{% if p.submission != 0 and pccfs|length > 1 %}<a href="/projects/{{ project.pk }}/pccf/{{ p.pk }}/delete/" style="color:var(--crit-ink)">Delete</a>{% endif %}</span></td></tr>
+  {% empty %}<tr><td colspan="12" class="muted">None yet.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% elif tab == 'pos' %}
+<div class="panel-head"><h2>Purchase orders</h2><span class="spacer"></span><a class="btn primary" href="/pos/new/?project={{ project.pk }}">+ New PO</a></div>
+<div class="tablewrap" style="margin-bottom:18px"><table>
+  <thead><tr><th>PO #</th><th>Vendor</th><th>Approved</th><th style="min-width:160px">Invoiced</th><th class="n">PO value</th><th class="n">Pending COs</th><th class="n">Invoiced</th><th class="n">Remaining</th></tr></thead>
+  <tbody>{% for r in pos %}
+    <tr><td><a href="/pos/{{ r.po.number }}/"><strong>{{ r.po.number }}</strong></a></td><td><a href="/vendors/{{ r.po.vendor_id }}/">{{ r.po.vendor }}</a></td><td class="nowrap">{{ r.po.approved_date|default:"–" }}</td>
+      <td>{% include "tracker/_po_bar.html" with r=r %}</td>
+      <td class="n">{{ r.po.amount|money:2 }}</td><td class="n">{% if r.pending %}{{ r.pending|money:2 }}{% endif %}</td>
+      <td class="n">{{ r.invoiced|money:2 }}</td><td class="n {% if r.remaining|neg %}neg{% endif %}">{{ r.remaining|money:2 }}</td></tr>
+  {% empty %}<tr><td colspan="8" class="muted">No POs.</td></tr>{% endfor %}</tbody>
+</table></div>
+<h2>Change orders</h2>
+<div class="tablewrap"><table>
+  <thead><tr><th>PO</th><th>Description</th><th class="n">Value</th><th>Status</th><th>Created</th></tr></thead>
+  <tbody>{% for c in change_orders %}
+    <tr><td><a href="/pos/{{ c.po.number }}/">{{ c.po.number }}</a></td><td>{{ c.description }}</td><td class="n">{{ c.value|money:2 }}</td>
+      <td>{% include "tracker/_co_status.html" with c=c %}</td>
+      <td>{{ c.created|date:"Y-m-d" }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">No change orders.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% else %}
+<div class="grid g2">
+  <div class="panel">
+    <div class="panel-head"><h2>Update history</h2></div>
+    {% for h in history %}
+      <div style="padding:9px 0;border-bottom:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between;gap:8px"><span class="pill">{{ h.get_kind_display }}</span><span class="muted nowrap" style="font-size:12px">{{ h.changed_at|date:"Y-m-d H:i" }}</span></div>
+        <div style="margin-top:4px;font-size:13px">{% if h.text %}<span class="pre">{{ h.text }}</span>{% else %}<span class="ink2">{% for k, v in h.data.items %}{% if k == 'fiscal_year' %}FY {{ v|fy|default:"–" }}{% else %}{{ k|cut:"_"|capfirst }}: {{ v|default:"–" }}{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</span>{% endif %}</div>
+      </div>
+    {% empty %}<p class="muted">No updates yet.</p>{% endfor %}
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Value of work entries</h2></div>
+    <table><thead><tr><th>Date</th><th class="n">Total (no fees)</th><th class="n">Previous years</th><th class="n">This year</th><th></th></tr></thead><tbody>
+    {% for v in vows %}<tr><td>{{ v.reporting_date }}</td><td class="n">{{ v.total_no_fees|money }}</td><td class="n">{{ v.previous_years_no_fees|money }}</td><td class="n">{{ v.current_year_no_fees|money }}</td>
+      <td><span class="rowacts"><a href="/vow/{{ v.pk }}/edit/">Edit</a><a href="/vow/{{ v.pk }}/delete/" style="color:var(--crit-ink)">Delete</a></span></td></tr>
+    {% empty %}<tr><td colspan="5" class="muted">None.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

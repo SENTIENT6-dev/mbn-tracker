@@ -1,0 +1,15 @@
+{# Project details laid out by the size of what goes in each box. Needs: form. #}
+<div class="proj-grid">
+  <div class="pg-row-title">What the project is</div>
+  <p class="s2">{{ form.io_number.label_tag }}{{ form.io_number }}{{ form.io_number.errors }}</p>
+  <p class="s7">{{ form.title.label_tag }}{{ form.title }}{{ form.title.errors }}</p>
+  <p class="s3">{{ form.bgis_number.label_tag }}{{ form.bgis_number }}{{ form.bgis_number.errors }}</p>
+
+  <div class="pg-row-title">Where <span class="pg-note">· client is always Infrastructure Ontario{% if me %}; project manager is {{ me }}{% endif %}</span></div>
+  <p class="s7">{{ form.building_asset.label_tag }}{{ form.building_asset }}{{ form.building_asset.errors }}</p>
+
+  <div class="pg-row-title">Classification</div>
+  <p class="s2">{{ form.status.label_tag }}{{ form.status }}{{ form.status.errors }}</p>
+  <p class="s2">{{ form.kind.label_tag }}{{ form.kind }}{{ form.kind.errors }}</p>
+  <p class="s3">{{ form.phase.label_tag }}{{ form.phase }}{{ form.phase.errors }}</p>
+</div>

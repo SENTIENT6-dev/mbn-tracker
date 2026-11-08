@@ -1,0 +1,57 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/pos/">Purchase orders</a> › {{ po.number }}</div>
+    <h1>PO {{ po.number }} · <a href="/vendors/{{ po.vendor_id }}/" style="color:inherit">{{ po.vendor }}</a></h1>
+    <div class="sub">Project <a href="/projects/{{ po.project_id }}/?tab=pos">{{ po.project.io_number }} · {{ po.project.title }}</a>
+      · approved {{ po.approved_date|default:"–" }}</div></div>
+  <span class="spacer"></span><a class="btn ghost-danger" href="/pos/{{ po.number }}/delete/">Delete</a><a class="btn" href="/pos/{{ po.number }}/edit/">Edit PO</a>
+</div>
+<div class="tiles">
+  <div class="tile"><div class="k">PO value</div><div class="v">{{ po.amount|money:2 }}</div></div>
+  <div class="tile"><div class="k">Approved, not yet in PO</div><div class="v">{{ row.pending|money:2 }}</div></div>
+  <div class="tile"><div class="k">Invoiced</div><div class="v">{{ row.invoiced|money:2 }}</div><div class="d">{{ row.pct|floatformat:0 }}% of PO</div></div>
+  <div class="tile {% if row.remaining|neg %}alert{% endif %}"><div class="k">Remaining</div><div class="v">{{ row.remaining|money:2 }}</div></div>
+</div>
+<div class="panel"><div class="panel-head"><h2>Invoiced against this PO</h2></div>{% include "tracker/_po_bar.html" with r=row %}</div>
+
+<div class="grid g2">
+  <div>
+    <div class="panel">
+      <h2>Add invoice</h2>
+      <form method="post" class="stack cols">{% csrf_token %}
+        {% if inv_form.non_field_errors %}<div class="full">{{ inv_form.non_field_errors }}</div>{% endif %}
+        <div class="full">{% include "tracker/_invoice_room.html" with fixed_po=po.pk %}</div>
+        <p>{{ inv_form.number.label_tag }}{{ inv_form.number }}{{ inv_form.number.errors }}</p>
+        <p>{{ inv_form.amount.label_tag }}{{ inv_form.amount }}{{ inv_form.amount.errors }}</p>
+        <p>{{ inv_form.date.label_tag }}{{ inv_form.date }}{{ inv_form.date.errors }}</p>
+        {% if inv_form.confirm_duplicate.field.widget.input_type == 'checkbox' %}
+          <p class="full"><label>{{ inv_form.confirm_duplicate }} {{ inv_form.confirm_duplicate.label }}</label></p>
+        {% else %}{{ inv_form.confirm_duplicate }}{% endif %}
+        <div class="full"><button class="btn primary js-save">Add invoice</button><div class="room-msg" role="alert"></div></div>
+      </form>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Invoice #</th><th>Date</th><th class="n">Amount</th><th></th></tr></thead>
+      <tbody>{% for i in invoices %}<tr><td>{{ i.number }}</td><td>{{ i.date|default:"–" }}</td><td class="n">{{ i.amount|money:2 }}</td>
+        <td><span class="rowacts"><a href="/invoices/{{ i.pk }}/edit/">Edit</a><a href="/invoices/{{ i.pk }}/delete/" style="color:var(--crit-ink)">Delete</a></span></td></tr>
+      {% empty %}<tr><td colspan="4" class="muted">No invoices yet.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+  <div>
+    <div class="panel">
+      <h2>Add change order</h2>
+      <form method="post" class="stack">{% csrf_token %}{{ co_form.as_p }}<button class="btn primary">Add change order</button></form>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Description</th><th class="n">Value</th><th>Status</th><th></th></tr></thead>
+      <tbody>{% for c in change_orders %}
+        <tr><td>{{ c.description }}{% if c.folder_link %}<br><span class="muted">{{ c.folder_link }}</span>{% endif %}</td>
+          <td class="n">{{ c.value|money:2 }}</td><td>{% include "tracker/_co_status.html" with c=c %}</td>
+          <td class="nowrap">{% include "tracker/_co_actions.html" with c=c next="" %}
+            <span class="rowacts" style="margin-top:4px"><a href="/change-orders/{{ c.pk }}/edit/">Edit</a><a href="/change-orders/{{ c.pk }}/delete/" style="color:var(--crit-ink)">Delete</a></span></td></tr>
+      {% empty %}<tr><td colspan="4" class="muted">No change orders.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+</div>
+{% endblock %}

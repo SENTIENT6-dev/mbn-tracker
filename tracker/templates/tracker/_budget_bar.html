@@ -1,0 +1,15 @@
+{% load money %}<div class="bwrap {% if lg %}lg{% endif %}">
+  <div class="bbar {% if lg %}lg{% endif %}" data-tip="{{ f.bar_tip }}">
+    {% if f.bar_invoiced %}<span class="inv" style="width:{{ f.bar_invoiced|floatformat:"2u" }}%"></span>{% endif %}
+    {% if f.bar_committed %}<span class="com" style="width:{{ f.bar_committed|floatformat:"2u" }}%"></span>{% endif %}
+    {% if f.bar_pending %}<span class="pen" style="width:{{ f.bar_pending|floatformat:"2u" }}%"></span>{% endif %}
+    {% if f.bar_over %}<span class="ovr" style="width:{{ f.bar_over|floatformat:"2u" }}%"></span>{% endif %}
+  </div>
+  {% if f.budget %}
+  <div class="bcap">
+    <span><b>{{ f.invoiced_pct|floatformat:0 }}%</b> invoiced</span>
+    <span><b>{{ f.committed_pct|floatformat:0 }}%</b> committed</span>
+    {% if f.over_amount %}<span class="bover">▲ over by {{ f.over_amount|money }}</span>{% endif %}
+  </div>
+  {% else %}<div class="bcap"><span>No budget</span></div>{% endif %}
+</div>

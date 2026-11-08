@@ -1,0 +1,18 @@
+# One-click demo on Render (render.com → New → Blueprint → pick this repo).
+# The free plan's disk is temporary, so the demo data is reloaded on every restart.
+services:
+  - type: web
+    name: mbn-tracker-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate --noinput && python manage.py seed_demo && gunicorn mbn_site.wsgi --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: MBN_DEBUG
+        value: "0"
+      - key: MBN_SECRET_KEY
+        generateValue: true
+      - key: MBN_PASSWORD
+        sync: false        # Render asks you for it; it is never stored in the repo

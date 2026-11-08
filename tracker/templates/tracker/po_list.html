@@ -1,0 +1,24 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Purchase orders</h1><div class="sub">{{ rows|length }} PO{{ rows|length|pluralize }} shown</div></div>
+  <span class="spacer"></span>
+  <div class="seg">
+    <a href="?open=1&q={{ q|urlencode }}" class="{% if open %}on{% endif %}">Active projects</a>
+    <a href="?q={{ q|urlencode }}" class="{% if not open %}on{% endif %}">All</a>
+  </div>
+  <form method="get">{% if open %}<input type="hidden" name="open" value="1">{% endif %}<input name="q" value="{{ q }}" placeholder="PO, vendor or project #" style="width:220px"></form>
+  <a class="btn primary" href="/pos/new/">+ New PO</a>
+</div>
+<div class="tablewrap"><table>
+  <thead><tr><th>PO #</th><th>Project</th><th>Vendor</th><th>Approved</th><th style="min-width:150px">Invoiced</th><th class="n">PO value</th><th class="n">Pending COs</th><th class="n">Invoiced</th><th class="n">Remaining</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr><td><a href="/pos/{{ r.po.number }}/"><strong>{{ r.po.number }}</strong></a></td>
+      <td><a href="/projects/{{ r.po.project_id }}/?tab=pos">{{ r.po.project.io_number }}</a></td>
+      <td><a href="/vendors/{{ r.po.vendor_id }}/">{{ r.po.vendor }}</a></td><td class="nowrap">{{ r.po.approved_date|default:"–" }}</td>
+      <td>{% include "tracker/_po_bar.html" with r=r %}</td>
+      <td class="n">{{ r.po.amount|money:2 }}</td><td class="n">{% if r.pending %}{{ r.pending|money:2 }}{% endif %}</td>
+      <td class="n">{{ r.invoiced|money:2 }}</td><td class="n {% if r.remaining|neg %}neg{% endif %}">{{ r.remaining|money:2 }}</td></tr>
+  {% empty %}<tr><td colspan="9" class="muted">No purchase orders match.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

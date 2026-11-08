@@ -1,0 +1,15 @@
+{% extends "tracker/base.html" %}
+{% block content %}
+<div class="toolbar"><h1 style="margin:0">{{ title }}</h1><span class="spacer"></span><a class="btn" href="{{ back }}">Cancel</a></div>
+<div class="panel">
+  <form method="post" class="stack cols {% if wide %}wide{% endif %}">{% csrf_token %}
+    {% if form.non_field_errors %}<div class="full">{{ form.non_field_errors }}</div>{% endif %}
+    {% for f in form %}
+      <p class="{% if f.field.widget.attrs.rows %}full{% endif %}">
+        {{ f.label_tag }} {{ f }} {% if f.help_text %}<span class="helptext">{{ f.help_text }}</span>{% endif %}{{ f.errors }}
+      </p>
+    {% endfor %}
+    <p class="full"><button class="btn primary">Save</button></p>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head"><div><h1>Change orders</h1>
+  <div class="sub">Open change orders. Approved ones count toward project commitments until they're processed into the PO.</div></div></div>
+<div class="tablewrap"><table>
+  <thead><tr><th>Project</th><th>PO</th><th>Vendor</th><th>Description</th><th class="n">Change</th><th class="n">PO after change</th><th>Status</th><th></th></tr></thead>
+  <tbody>{% for c in change_orders %}
+    <tr><td><a href="/projects/{{ c.po.project_id }}/?tab=pos">{{ c.po.project.io_number }}</a></td>
+      <td><a href="/pos/{{ c.po.number }}/">{{ c.po.number }}</a></td><td>{{ c.po.vendor }}</td><td>{{ c.description }}</td>
+      <td class="n">{{ c.value|money:2 }}</td><td class="n">{{ c.po.amount|add:c.value|money:2 }}</td>
+      <td>{% include "tracker/_co_status.html" with c=c %}</td>
+      <td class="nowrap">{% include "tracker/_co_actions.html" with c=c next="/change-orders/" %}</td></tr>
+  {% empty %}<tr><td colspan="8" class="muted">✓ Nothing open. Add change orders from a PO's page.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

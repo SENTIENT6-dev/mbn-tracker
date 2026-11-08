@@ -1,0 +1,69 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/facilities/">Facilities</a> ›{% if b.property %} <a href="/facilities/properties/{{ b.property_id }}/">{{ b.property }}</a> ›{% endif %} {{ b.asset_number }}</div>
+    <h1>{{ b.asset_number }} · {{ b.name|default:"Unnamed building" }}</h1>
+    <div class="sub">{{ b.address }}{% if b.city %}, {{ b.city }}{% endif %} {{ b.postal_code }}
+      {% if b.latitude and b.longitude and b.latitude != 44.74255935 %} · <a href="https://www.openstreetmap.org/?mlat={{ b.latitude|stringformat:'f' }}&mlon={{ b.longitude|stringformat:'f' }}#map=17/{{ b.latitude|stringformat:'f' }}/{{ b.longitude|stringformat:'f' }}" target="_blank" rel="noopener">Map ↗</a>{% endif %}</div></div>
+  <span class="spacer"></span>
+  <a class="btn" href="/facilities/buildings/{{ b.pk }}/edit/">Edit building</a>
+  <a class="btn ghost-danger" href="/facilities/buildings/{{ b.pk }}/delete/">Delete</a>
+</div>
+
+<div class="tiles">
+  <div class="tile"><div class="k">Projects</div><div class="v">{{ rows|length }}</div></div>
+  <div class="tile"><div class="k">Floors</div><div class="v">{{ b.floors|default:"–" }}</div></div>
+  <div class="tile"><div class="k">Built</div><div class="v">{{ b.construction_year|default:"–" }}</div></div>
+  <div class="tile"><div class="k">Area</div><div class="v">{% if b.area %}{{ b.area|floatformat:"0g" }}{% else %}–{% endif %}</div></div>
+  <div class="tile"><div class="k">Heritage</div><div class="v" style="font-size:16px">{{ b.heritage_status|default:"–" }}</div></div>
+</div>
+
+<div class="grid g-main">
+  <div>
+    <div class="panel-head"><h2>Projects at this building</h2><span class="spacer"></span><a class="btn small" href="/projects/new/">+ New project</a></div>
+    <div class="tablewrap" style="margin-bottom:18px"><table>
+      <thead><tr><th>Project</th><th>Status</th><th style="min-width:160px">Budget used</th><th class="n">Budget</th><th class="n">Invoiced</th></tr></thead>
+      <tbody>{% for f in rows %}
+        <tr><td><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a><div class="ink2" style="font-size:12px">{{ f.project.title|truncatechars:40 }}</div></td>
+          <td><span class="pill {% if f.project.status == 1 %}blue{% endif %}">{{ f.project.get_status_display }}</span></td>
+          <td>{% include "tracker/_budget_bar.html" with f=f %}</td><td class="n">{{ f.budget|money }}</td><td class="n">{{ f.invoiced|money }}</td></tr>
+      {% empty %}<tr><td colspan="5" class="muted">No projects at this building.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <div class="panel">
+      <div class="panel-head"><h2>Building details</h2></div>
+      <dl class="kv">
+        <dt>Property</dt><dd>{% if b.property %}<a href="/facilities/properties/{{ b.property_id }}/">{{ b.property }}</a>{% else %}–{% endif %}</dd>
+        <dt>Purpose</dt><dd>{{ b.purpose|default:"–" }}</dd>
+        <dt>Landlord</dt><dd>{{ b.landlord|default:"–" }}</dd>
+        <dt>BGIS building #</dt><dd>{{ b.bgis_building|default:"–" }}</dd>
+        <dt>Parent asset</dt><dd>{{ b.parent_asset|default:"–" }}</dd>
+        <dt>Coordinates</dt><dd>{% if b.latitude %}{{ b.latitude|floatformat:5 }}, {{ b.longitude|floatformat:5 }}{% else %}–{% endif %}</dd>
+      </dl>
+    </div>
+    {% if siblings %}
+    <div class="panel">
+      <div class="panel-head"><h2>Other buildings on this property</h2></div>
+      {% for s in siblings %}<a href="/facilities/buildings/{{ s.pk }}/" class="pill" style="margin:0 4px 6px 0">{{ s.asset_number }} {{ s.name|truncatechars:24 }}</a>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <div>
+    <div class="panel">
+      <div class="panel-head"><h2>Contacts</h2></div>
+      {% for role, items in roles.items %}
+        <h3 style="margin-top:6px">{{ role }}</h3>
+        {% for r in items %}
+          <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
+            <div><a href="/vendors/{{ r.person.company_id }}/#contacts"><strong>{{ r.person }}</strong></a>
+              <div class="ink2" style="font-size:12px">{{ r.person.company }}{% if r.person.email %} · <a href="mailto:{{ r.person.email }}">{{ r.person.email }}</a>{% endif %}</div></div>
+            <form method="post" action="/facilities/roles/{{ r.pk }}/delete/">{% csrf_token %}<button class="linkbtn del" style="font-size:12.5px" data-confirm="Remove? Click again">Remove</button></form>
+          </div>
+        {% endfor %}
+      {% empty %}<p class="muted">No contacts for this building.</p>{% endfor %}
+      <details style="margin-top:12px"><summary>Add a contact</summary>
+        <form method="post" class="stack" style="margin-top:10px">{% csrf_token %}{{ role_form.non_field_errors }}{{ role_form.as_p }}
+          <button class="btn primary">Add</button> <a href="/people/new/" class="ink2" style="font-size:12.5px;margin-left:8px">Person not listed? Add them first</a></form></details>
+    </div>
+  </div>
+</div>
+{% endblock %}

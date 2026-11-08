@@ -1,0 +1,78 @@
+{# Sectioned layout shared by the charter (New project) and the PCCF add/edit page. Needs: f = the form. #}
+{% load money %}
+<div class="pccf">
+  <section>
+    <h3>Submission</h3>
+    <div class="row-fields">
+      <p>{{ f.date.label_tag }}{{ f.date }}{{ f.date.errors }}</p>
+      {% if f.final %}<p class="check">{{ f.final }} {{ f.final.label_tag }}{{ f.final.errors }}</p>{% endif %}
+    </div>
+  </section>
+
+  <section>
+    <h3>Budget{% if charter_required %}<span class="req"></span>{% endif %}</h3>
+    {% if charter_required %}<p class="req-note">At least one of design, design contingency, construction or construction contingency must be above $0.</p>{% endif %}
+    <div class="budget-grid">
+      <span></span><span class="colhead">Amount</span><span class="colhead">Contingency</span>
+      <span class="rowhead">Design</span>
+      <p>{{ f.design_cost }}{{ f.design_cost.errors }}</p>
+      <p>{{ f.design_contingency }}{{ f.design_contingency.errors }}</p>
+      <span class="rowhead">Construction</span>
+      <p>{{ f.construction_cost }}{{ f.construction_cost.errors }}</p>
+      <p>{{ f.construction_contingency }}{{ f.construction_contingency.errors }}</p>
+      <span class="rowhead">Fee</span>
+      <p><label for="{{ f.fee_percent.id_for_label }}" class="mini">Fee %</label>{{ f.fee_percent }}{{ f.fee_percent.errors }}</p>
+      <p><label for="{{ f.fee.id_for_label }}" class="mini">Fee amount · calculated</label>{{ f.fee }}{% if f.fee.help_text %}<span class="helptext">{{ f.fee.help_text }}</span>{% endif %}{{ f.fee.errors }}</p>
+    </div>
+  </section>
+
+  <section>
+    <h3>Approved schedule <span class="hint">in the order the milestones happen</span></h3>
+    <div class="timeline-fields">
+      {% include "tracker/_milestone_field.html" with fld=f.approval_date n=1 %}
+      {% include "tracker/_milestone_field.html" with fld=f.design_start n=2 %}
+      {% include "tracker/_milestone_field.html" with fld=f.design_end n=3 %}
+      {% include "tracker/_milestone_field.html" with fld=f.construction_award n=4 %}
+      {% include "tracker/_milestone_field.html" with fld=f.substantial n=5 %}
+      {% include "tracker/_milestone_field.html" with fld=f.closeout n=6 %}
+    </div>
+  </section>
+
+  <section>
+    <h3>Approved cash flow</h3>
+    <div class="row-fields">
+      <p style="max-width:220px">{{ f.fiscal_year.label_tag }}{{ f.fiscal_year }}<span class="helptext">Fiscal years run April to March</span>{{ f.fiscal_year.errors }}</p>
+    </div>
+    <div class="cash-strip">
+      <div class="cs-group"><div class="cs-title">Before this year</div>
+        <p>{{ f.previous.label_tag }}{{ f.previous }}{{ f.previous.errors }}</p></div>
+      <div class="cs-group this-year"><div class="cs-title">This fiscal year <strong class="fy-total" data-fy-total>$0.00</strong></div>
+        <div class="quarters">
+          <p>{{ f.q1.label_tag }}{{ f.q1 }}{{ f.q1.errors }}</p>
+          <p>{{ f.q2.label_tag }}{{ f.q2 }}{{ f.q2.errors }}</p>
+          <p>{{ f.q3.label_tag }}{{ f.q3 }}{{ f.q3.errors }}</p>
+          <p>{{ f.q4.label_tag }}{{ f.q4 }}{{ f.q4.errors }}</p>
+        </div></div>
+      <div class="cs-group"><div class="cs-title">After this year</div>
+        <div class="quarters two">
+          <p>{{ f.next_year.label_tag }}{{ f.next_year }}{{ f.next_year.errors }}</p>
+          <p>{{ f.future.label_tag }}{{ f.future }}{{ f.future.errors }}</p>
+        </div></div>
+    </div>
+  </section>
+
+  <section>
+    <h3>{{ f.notes.label }}</h3>
+    <p>{{ f.notes }}{% if f.notes.help_text %}<span class="helptext">{{ f.notes.help_text }}</span>{% endif %}{{ f.notes.errors }}</p>
+  </section>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[data-fy-total]').forEach(out => {
+    const form = out.closest('form');
+    const qs = ['q1', 'q2', 'q3', 'q4'].map(n => form.querySelector(`input[name="${n}"], input[name$="-${n}"]`));
+    const upd = () => out.textContent = '$' + moneyFmt(qs.reduce((s, el) => s + moneyVal(el), 0));
+    qs.forEach(el => el.addEventListener('input', upd)); upd();
+  });
+});
+</script>

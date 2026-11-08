@@ -1,0 +1,22 @@
+{% extends "tracker/base.html" %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Facilities</h1><div class="sub">{{ total|floatformat:"0g" }} propert{{ total|pluralize:"y,ies" }}</div></div>
+  <span class="spacer"></span>
+  <a class="btn primary" href="/facilities/properties/new/">+ New property</a>
+</div>
+{% include "tracker/_fac_nav.html" with active="properties" %}
+<form method="get" style="display:flex;gap:8px;margin-bottom:14px">
+  <input name="q" value="{{ q }}" placeholder="Property # or name" style="width:280px"><button class="btn">Search</button>
+  {% if q %}<a class="btn" href="/facilities/properties/">Clear</a>{% endif %}
+</form>
+<div class="tablewrap"><table>
+  <thead><tr><th>Property #</th><th>Name</th><th class="n">Buildings</th><th class="n">Projects</th></tr></thead>
+  <tbody>{% for p in page %}
+    <tr><td><a href="/facilities/properties/{{ p.pk }}/"><strong>{{ p.number }}</strong></a></td><td>{{ p.name }}</td>
+      <td class="n"><a href="/facilities/?property={{ p.number|urlencode }}">{{ p.building_count }}</a></td>
+      <td class="n">{% if p.project_count %}<span class="pill blue">{{ p.project_count }}</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">No properties match.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% include "tracker/_pager.html" %}
+{% endblock %}

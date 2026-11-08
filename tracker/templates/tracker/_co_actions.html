@@ -1,0 +1,9 @@
+{% if c.status == 'requested' %}
+<form method="post" action="/change-orders/{{ c.pk }}/approve/" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><button class="btn small">Approve</button></form>
+{% endif %}
+{% if c.status == 'approved' %}
+<form method="post" action="/change-orders/{{ c.pk }}/process/" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><button class="btn small primary" data-confirm="Add {{ c.value|floatformat:'2g' }} to PO {{ c.po.number }}? Click again">Process into PO</button></form>
+{% endif %}
+{% if c.status == 'requested' or c.status == 'approved' %}
+<form method="post" action="/change-orders/{{ c.pk }}/reject/" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><button class="btn small">Reject</button></form>
+{% endif %}

@@ -1,0 +1,26 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ title }} – MBN Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/pos/">Purchase orders</a> › {% if form.instance.pk %}{{ form.instance.number }}{% else %}New{% endif %}</div>
+    <h1>{{ title }}</h1>
+    <div class="sub">Fields marked <span class="req"></span> are required.</div></div>
+  <span class="spacer"></span><a class="btn" href="{{ back }}">Cancel</a>
+</div>
+<form method="post" class="stack">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="panel" style="max-width:1100px">
+    <div class="proj-grid">
+      <div class="pg-row-title">The order</div>
+      <p class="s3">{{ form.number.label_tag }}{{ form.number }}{{ form.number.errors }}</p>
+      <p class="s3">{{ form.approved_date.label_tag }}{{ form.approved_date }}{{ form.approved_date.errors }}</p>
+      <p class="s3">{{ form.amount.label_tag }}{{ form.amount }}<span class="helptext">{{ form.amount.help_text }}</span>{{ form.amount.errors }}</p>
+
+      <div class="pg-row-title">For which project, from which vendor</div>
+      <p class="s6">{{ form.project.label_tag }}{{ form.project }}{% if form.project.help_text %}<span class="helptext">{{ form.project.help_text }}</span>{% endif %}{{ form.project.errors }}</p>
+      <p class="s6">{{ form.vendor.label_tag }}{{ form.vendor }}<span class="helptext">Not listed? <a href="/vendors/new/" target="_blank" rel="noopener">Add the vendor</a> (new tab), then come back.</span>{{ form.vendor.errors }}</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px"><button class="btn primary">Save PO</button><a class="btn" href="{{ back }}">Cancel</a></div>
+</form>
+{% endblock %}

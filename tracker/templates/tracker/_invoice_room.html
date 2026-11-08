@@ -1,0 +1,47 @@
+{# Live "what's left" box for invoice forms. Needs: rooms (per PO id), optional fixed_po (PO id). #}
+{{ rooms|json_script:"room-data" }}
+<div class="room" id="room-box" data-fixed-po="{{ fixed_po|default:'' }}"></div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const data = JSON.parse(document.getElementById('room-data').textContent);
+  const box = document.getElementById('room-box');
+  const form = box.closest('form');
+  const sel = form.querySelector('select[name$="po"]');
+  const amt = form.querySelector('input[name$="amount"]');
+  const saves = form.querySelectorAll('.js-save');
+  const msg = form.querySelector('.room-msg');
+  const $ = n => (n < 0 ? '−$' : '$') + Math.abs(n).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const poId = () => box.dataset.fixedPo || (sel ? sel.value : '');
+
+  function update(){
+    const r = data[poId()];
+    if (!r) {
+      box.innerHTML = '<div class="muted">Pick a PO to see how much is left to invoice.</div>';
+      setBlocked(false, ''); return;
+    }
+    const projLine = r.has_budget
+      ? `<div class="room-row ${r.limit === 'project' ? 'lim' : ''}"><span>Project ${r.project} budget left after fees</span><strong>${$(r.proj_left)}</strong>
+           <small>${$(r.budget)} budget (excl. fee) − ${$(r.proj_invoiced)} invoiced</small></div>`
+      : `<div class="room-row"><span>Project ${r.project}</span><strong>—</strong><small>No PCCF budget on file, so only the PO limit applies</small></div>`;
+    box.innerHTML =
+      `<div class="room-row ${r.limit === 'po' ? 'lim' : ''}"><span>PO ${r.po} remaining</span><strong>${$(r.po_left)}</strong>
+         <small>${$(r.po_value)} PO value${r.po_pending ? ' + ' + $(r.po_pending) + ' approved changes' : ''} − ${$(r.po_invoiced)} invoiced</small></div>`
+      + projLine
+      + `<div class="room-row total"><span>Available for this invoice</span><strong class="${r.available <= 0 ? 'neg' : ''}">${$(r.available)}</strong></div>`;
+    const a = moneyVal(amt);
+    if (a > 0 && a > r.available + 0.004) {
+      const why = r.limit === 'project'
+        ? `project ${r.project} has only ${$(r.proj_left)} of budget left after fees. Get a revised PCCF approved first.`
+        : `PO ${r.po} has only ${$(r.po_left)} left. Get a change order approved for this PO first.`;
+      setBlocked(true, `Not enough budget for approval: this invoice is ${$(a)} but ${why}`);
+    } else setBlocked(false, '');
+  }
+  function setBlocked(on, text){
+    saves.forEach(b => { b.disabled = on; b.title = on ? 'Not enough budget for approval' : ''; });
+    if (msg) { msg.textContent = text; msg.style.display = text ? 'block' : 'none'; }
+  }
+  if (sel) sel.addEventListener('change', update);
+  if (amt) amt.addEventListener('input', update);
+  update();
+});
+</script>

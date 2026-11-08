@@ -1,0 +1,86 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/vendors/">Vendors</a> › {{ c.name }}</div>
+    <h1>{{ c.name }}</h1>
+    <div class="sub" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      {% if c.company_type %}<span class="pill blue">{{ c.company_type }}</span>{% endif %}
+      {% if c.vendor_number %}<span>Vendor # {{ c.vendor_number }}</span>{% endif %}
+      {% if c.acronym %}<span>· {{ c.acronym }}</span>{% endif %}
+      {% if c.phone %}<span>· {{ c.phone }}</span>{% endif %}
+    </div></div>
+  <span class="spacer"></span>
+  <a class="btn" href="/vendors/{{ c.pk }}/edit/">Edit details</a>
+  <a class="btn ghost-danger" href="/vendors/{{ c.pk }}/delete/">Delete</a>
+</div>
+
+<div class="tiles">
+  <div class="tile"><div class="k">Purchase orders</div><div class="v">{{ rows|length }}</div><div class="d">on {{ projects|length }} project{{ projects|length|pluralize }}</div></div>
+  <div class="tile"><div class="k">Committed</div><div class="v">{{ committed|money }}</div>{% if pending %}<div class="d">+ {{ pending|money }} approved changes</div>{% endif %}</div>
+  <div class="tile"><div class="k">Invoiced</div><div class="v">{{ invoiced|money }}</div></div>
+  <div class="tile"><div class="k">Left to invoice</div><div class="v">{{ committed|add:pending|sub:invoiced|money }}</div></div>
+  <div class="tile"><div class="k">Contacts</div><div class="v">{{ people|length }}</div></div>
+</div>
+
+<div class="grid g-main">
+  <div>
+    <div class="panel-head"><h2>Purchase orders</h2></div>
+    <div class="tablewrap" style="margin-bottom:18px"><table>
+      <thead><tr><th>PO #</th><th>Project</th><th>Approved</th><th style="min-width:140px">Invoiced</th><th class="n">PO value</th><th class="n">Invoiced</th><th class="n">Remaining</th></tr></thead>
+      <tbody>{% for r in rows %}
+        <tr><td><a href="/pos/{{ r.po.number }}/"><strong>{{ r.po.number }}</strong></a></td>
+          <td><a href="/projects/{{ r.po.project_id }}/">{{ r.po.project.io_number }}</a><div class="ink2" style="font-size:12px">{{ r.po.project.title|truncatechars:34 }}</div></td>
+          <td class="nowrap">{{ r.po.approved_date|default:"–" }}</td><td>{% include "tracker/_po_bar.html" with r=r %}</td>
+          <td class="n">{{ r.po.amount|money:2 }}</td><td class="n">{{ r.invoiced|money:2 }}</td>
+          <td class="n {% if r.remaining|neg %}neg{% endif %}">{{ r.remaining|money:2 }}</td></tr>
+      {% empty %}<tr><td colspan="7" class="muted">No purchase orders with this company.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if client_projects %}
+      <div class="panel-head"><h2>Client on projects</h2></div>
+      <div class="tablewrap" style="margin-bottom:18px"><table><tbody>{% for p in client_projects %}
+        <tr><td><a href="/projects/{{ p.pk }}/">{{ p.io_number }}</a></td><td>{{ p.title }}</td><td><span class="pill">{{ p.get_status_display }}</span></td></tr>{% endfor %}</tbody></table></div>
+    {% endif %}
+  </div>
+  <div>
+    {% if by_year %}
+    <div class="panel">
+      <div class="panel-head"><h2>Invoiced per year</h2></div>
+      <div class="hbars">{% for r in by_year %}
+        <div class="lab">{{ r.y|default:"No date" }}</div>
+        <div class="trk" data-tip="{{ r.y }}: {{ r.t|money:2 }} invoiced"><span style="width:{{ r.pct|floatformat:"2u" }}%"></span></div>
+        <div class="val">{{ r.t|money }}</div>{% endfor %}</div>
+    </div>
+    {% endif %}
+
+    <div class="panel" id="contacts">
+      <div class="panel-head"><h2>Contacts</h2></div>
+      {% for p in people %}
+        <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div style="display:flex;justify-content:space-between;gap:8px"><strong>{{ p }}</strong>
+            <span class="rowacts"><a href="/people/{{ p.pk }}/edit/">Edit</a><a class="ghost-danger" href="/people/{{ p.pk }}/delete/" style="color:var(--crit-ink)">Remove</a></span></div>
+          <div class="ink2" style="font-size:12.5px">{{ p.position }}{% if p.email %} · <a href="mailto:{{ p.email }}">{{ p.email }}</a>{% endif %}{% if p.phone %} · {{ p.phone }}{% endif %}</div>
+        </div>
+      {% empty %}<p class="muted">No contacts yet.</p>{% endfor %}
+      <details style="margin-top:12px"><summary>Add a contact</summary>
+        <form method="post" class="stack" style="margin-top:10px">{% csrf_token %}{{ person_form.as_p }}<button class="btn primary">Add contact</button></form></details>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Details</h2></div>
+      <dl class="kv">
+        <dt>HST #</dt><dd>{{ c.hst_number|default:"–" }}</dd>
+        <dt>Address</dt><dd>{{ c.address|default:"–" }}{% if c.city %}, {{ c.city }}{% endif %} {{ c.province }} {{ c.postal_code }}</dd>
+        <dt>Website</dt><dd>{% if c.website %}<a href="{% if '://' not in c.website %}https://{% endif %}{{ c.website }}" target="_blank" rel="noopener">{{ c.website }}</a>{% else %}–{% endif %}</dd>
+      </dl>
+      {% if c.notes %}<div class="pre" style="margin-top:10px">{{ c.notes }}</div>{% endif %}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Merge into another company</h2></div>
+      <p class="ink2" style="margin-top:-6px;font-size:13px">For duplicates or renamed vendors: moves all POs, client projects and contacts to the company you pick, then removes this one.</p>
+      <form method="post" action="/vendors/{{ c.pk }}/merge/" class="stack">{% csrf_token %}
+        {{ merge_form.as_p }}<button class="btn" data-confirm="Move everything to the selected company and delete {{ c.name }}? Click again to merge">Merge</button></form>
+    </div>
+  </div>
+</div>
+{% endblock %}

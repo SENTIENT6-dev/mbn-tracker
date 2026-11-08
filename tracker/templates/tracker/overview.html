@@ -1,0 +1,123 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{% if me %}{{ me.first_name }}'s projects{% else %}Overview{% endif %}</h1><div class="sub">Active and on-hold projects · {{ today|date:"l, F j, Y" }}</div></div>
+  <span class="spacer"></span>
+  <a class="btn" href="/calendar/">Open calendar</a>
+  <a class="btn primary" href="/projects/new/">+ New project</a>
+</div>
+
+{% if open_issues %}<div class="banner">{{ open_issues }} data issue{{ open_issues|pluralize }} need{{ open_issues|pluralize:"s," }} a decision. <a href="/issues/">Review</a></div>{% endif %}
+
+<div class="tiles">
+  <a class="tile" href="/projects/"><div class="k">Active projects</div><div class="v">{{ rows|length }}</div>
+    <div class="d">{{ totals.budget_with_fee|money }} total budget incl. fee</div></a>
+  <div class="tile"><div class="k">Committed</div><div class="v">{{ totals.commitments|money }}</div>
+    <div class="d">{{ committed_pct|floatformat:0 }}% of budget (no fee)</div></div>
+  <div class="tile"><div class="k">Invoiced</div><div class="v">{{ totals.invoiced|money }}</div>
+    <div class="d">{{ invoiced_pct|floatformat:0 }}% of budget · VOW {{ totals.vow_total|money }}</div></div>
+  <a class="tile" href="/calendar/"><div class="k">Milestones, next 90 days</div><div class="v">{{ upcoming_count }}</div>
+    <div class="d">on the calendar</div></a>
+  <a class="tile {% if overdue_count %}alert{% endif %}" href="/calendar/"><div class="k">Overdue milestones</div><div class="v">{{ overdue_count }}</div>
+    <div class="d">forecast passed, no actual date</div></a>
+  <a class="tile" href="/change-orders/"><div class="k">Open change orders</div><div class="v">{{ open_cos }}</div>
+    <div class="d">awaiting approval or processing</div></a>
+  <a class="tile" href="/mpsr/"><div class="k">MPSR {{ today|date:"F" }}</div><div class="v">{{ mpsr_done }} / {{ rows|length }}</div>
+    <div class="d">{% if mpsr_done == rows|length and rows %}✓ all projects done{% else %}projects done · open MPSR mode{% endif %}</div></a>
+</div>
+
+<div class="grid g-main">
+  <div>
+    <div class="panel">
+      <div class="panel-head"><h2>Invoiced per month</h2><span class="spacer"></span>
+        <span class="ink2" style="font-size:12.5px">24 months to {{ latest_invoice|date:"M Y" }} · last 12 months {{ last12|money }}</span></div>
+      <div class="mcols">
+        {% for m in months %}<div class="mc" data-tip="{{ m.date|date:'F Y' }}
+Invoiced {{ m.t|money }}"><span style="height:{{ m.pct|floatformat:"2u" }}%"></span></div>{% endfor %}
+      </div>
+      <div class="mlabels">{% for m in months %}<div>{% if m.date.month == 1 %}{{ m.date|date:"M Y" }}{% elif m.date.month == 4 or m.date.month == 7 or m.date.month == 10 %}{{ m.date|date:"M" }}{% endif %}</div>{% endfor %}</div>
+    </div>
+
+    <div class="grid g2">
+      <div class="panel">
+        <div class="panel-head"><h2>Cash flow this fiscal year</h2><span class="spacer"></span>
+          <div class="legend"><span><i style="background:var(--s1)"></i>Approved</span><span><i style="background:var(--s2)"></i>Forecast</span></div></div>
+        <div class="qcols">
+          {% for q in cash %}<div class="q" data-tip="{{ q.label }} · active projects
+Approved (PCCF): {{ q.approved|money }}
+Current forecast: {{ q.forecast|money }}"><div class="b a" style="height:{{ q.a_pct|floatformat:"2u" }}%"></div><div class="b f" style="height:{{ q.f_pct|floatformat:"2u" }}%"></div></div>{% endfor %}
+        </div>
+        <div class="qlab">{% for q in cash %}<div>{{ q.label }}<div class="muted">{{ q.forecast|money }}</div></div>{% endfor %}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Top vendors, active projects</h2><span class="spacer"></span><a href="/vendors/">All →</a></div>
+        <div class="hbars">
+          {% for v in vendors %}
+            <a class="lab" href="/vendors/{{ v.vendor_id }}/" title="{{ v.vendor__name }}">{{ v.vendor__name|truncatechars:24 }}</a>
+            <div class="trk" data-tip="{{ v.vendor__name }}
+{{ v.n }} PO{{ v.n|pluralize }} · {{ v.t|money }} committed"><span style="width:{{ v.pct|floatformat:"2u" }}%"></span></div>
+            <div class="val">{{ v.t|money }}</div>
+          {% empty %}<p class="muted">No POs on active projects.</p>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Budget use by project</h2><span class="spacer"></span>
+        <div class="legend"><span><i style="background:var(--seq-1)"></i>Invoiced</span><span><i style="background:var(--seq-2)"></i>Committed, not invoiced</span>
+          <span><i class="lg-pen"></i>Pending COs</span><span><i class="lg-ovr"></i>Over budget</span><span class="muted">· full bar = budget (no fee)</span></div></div>
+      <table>
+        <thead><tr><th>Project</th><th style="width:42%">Budget (no fee) used</th><th class="n">Budget</th><th class="n">Uncommitted</th><th>Health</th></tr></thead>
+        <tbody>
+        {% for f in rows %}
+          <tr>
+            <td><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a><div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:38 }}</div></td>
+            <td>{% include "tracker/_budget_bar.html" with f=f %}</td>
+            <td class="n">{{ f.budget|money }}</td>
+            <td class="n {% if f.remaining_budget|neg %}neg{% endif %}">{{ f.remaining_budget|money }}</td>
+            <td class="nowrap">{% include "tracker/_health.html" with f=f %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="panel-head"><h2>Needs attention</h2></div>
+      {% for f in attention %}
+        <a href="/projects/{{ f.project.pk }}/" style="display:block;color:inherit;padding:9px 0;border-bottom:1px solid var(--line)">
+          <div style="display:flex;justify-content:space-between;gap:8px"><strong>{{ f.project.io_number }}</strong>
+            <span>{% include "tracker/_health.html" with f=f %}</span></div>
+          <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:44 }}
+            {% if f.budget_health == 'over' %} · over by {{ f.remaining_budget|abs|money }}{% endif %}</div>
+        </a>
+      {% empty %}<p class="muted">Nothing over budget or overdue.</p>{% endfor %}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Upcoming milestones</h2><span class="spacer"></span><a href="/calendar/">Calendar →</a></div>
+      {% for e in upcoming %}
+        <div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center">
+          <div style="width:46px;text-align:center;flex:none"><div style="font-size:11px;color:var(--ink-2);font-weight:600">{{ e.date|date:"M"|upper }}</div>
+            <div style="font-size:19px;font-weight:650;line-height:1.1">{{ e.date|date:"j" }}</div></div>
+          <div style="min-width:0"><div><span class="dot" style="background:var(--{% if e.key == 'design' %}s1{% elif e.key == 'award' %}s2{% elif e.key == 'substantial' %}s3{% else %}s4{% endif %})"></span> {{ e.label }}</div>
+            <a href="/projects/{{ e.project.pk }}/" class="ink2" style="font-size:12.5px">{{ e.project.io_number }} · {{ e.project.title|truncatechars:34 }}</a></div>
+        </div>
+      {% empty %}<p class="muted">No milestones in the next 90 days. Forecast dates are updated on each project's MPSR tab.</p>{% endfor %}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Projects by stage</h2></div>
+      <div class="hbars">
+        {% for s in stages %}
+          <div class="lab">{{ s.name }}</div>
+          <div class="trk" data-tip="{{ s.name }}: {{ s.n }} project{{ s.n|pluralize }}">{% if s.n %}<span style="width:{{ s.pct|floatformat:"1u" }}%"></span>{% endif %}</div>
+          <div class="val">{{ s.n }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Invoices</h1>
+    <div class="sub">{{ count|floatformat:"0g" }} invoice{{ count|pluralize }} · {{ total|money:2 }}{% if fy_label %} · FY {{ fy_label }}{% endif %}{% if filtered %} (filtered){% endif %}</div></div>
+  <span class="spacer"></span>
+  <a class="btn primary" href="/invoices/new/">+ Add invoice</a>
+</div>
+
+<form method="get" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+  <input name="q" value="{{ q }}" placeholder="Invoice #, PO #, vendor or project" style="width:260px">
+  <select name="fy" onchange="this.form.submit()">
+    <option value="">All fiscal years</option>
+    {% for y, label in fy_options %}<option value="{{ y }}" {% if fy == y|stringformat:"s" %}selected{% endif %}>FY {{ label }}</option>{% endfor %}
+  </select>
+  <label class="ink2" style="font-size:12.5px">From <input type="date" name="from" value="{{ start }}"></label>
+  <label class="ink2" style="font-size:12.5px">To <input type="date" name="to" value="{{ end }}"></label>
+  <label class="btn" style="font-weight:500"><input type="checkbox" name="active" value="1" {% if active %}checked{% endif %} onchange="this.form.submit()"> Active projects only</label>
+  <select name="sort" onchange="this.form.submit()">
+    <option value="date" {% if sort == 'date' %}selected{% endif %}>Newest first</option>
+    <option value="amount" {% if sort == 'amount' %}selected{% endif %}>Largest first</option>
+    <option value="number" {% if sort == 'number' %}selected{% endif %}>Invoice #</option>
+    <option value="po" {% if sort == 'po' %}selected{% endif %}>PO #</option>
+  </select>
+  <button class="btn">Apply</button>
+  {% if filtered %}<a class="btn" href="/invoices/">Clear</a>{% endif %}
+</form>
+
+<div class="grid g-main">
+  <div class="panel">
+    <div class="panel-head"><h2>Invoiced per month</h2><span class="spacer"></span>
+      <span class="ink2" style="font-size:12.5px">{{ range_label }}</span></div>
+    <div class="mcols">
+      {% for m in months %}<div class="mc" data-tip="{{ m.date|date:'F Y' }}
+Invoiced {{ m.t|money }}"><span style="height:{{ m.pct|floatformat:"2u" }}%"></span></div>{% endfor %}
+    </div>
+    <div class="mlabels">{% for m in months %}<div>{% if m.date.month == 1 %}{{ m.date|date:"M Y" }}{% elif m.date.month == 4 or m.date.month == 7 or m.date.month == 10 %}{{ m.date|date:"M" }}{% endif %}</div>{% endfor %}</div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>By vendor</h2></div>
+    <div class="hbars">
+      {% for v in vendors %}
+        <a class="lab" href="/vendors/{{ v.po__vendor_id }}/" title="{{ v.po__vendor__name }}">{{ v.po__vendor__name|truncatechars:22 }}</a>
+        <div class="trk" data-tip="{{ v.po__vendor__name }}
+{{ v.n }} invoice{{ v.n|pluralize }} · {{ v.t|money:2 }}"><span style="width:{{ v.pct|floatformat:"2u" }}%"></span></div>
+        <div class="val">{{ v.t|money }}</div>
+      {% empty %}<p class="muted">No invoices match.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>Date</th><th>Invoice #</th><th class="n">Amount</th><th>PO</th><th>Vendor</th><th>Project</th><th></th></tr></thead>
+  <tbody>{% for i in page %}
+    <tr><td class="nowrap">{% if i.date %}{{ i.date }}{% if i.date > today %} <span class="pill warn" title="Dated in the future">future</span>{% endif %}{% else %}<span class="pill warn">no date</span>{% endif %}</td>
+      <td><strong>{{ i.number }}</strong></td>
+      <td class="n {% if i.amount|neg %}neg{% endif %}">{{ i.amount|money:2 }}</td>
+      <td><a href="/pos/{{ i.po.number }}/">{{ i.po.number }}</a></td>
+      <td><a href="/vendors/{{ i.po.vendor_id }}/">{{ i.po.vendor|truncatechars:34 }}</a></td>
+      <td><a href="/projects/{{ i.po.project_id }}/?tab=pos">{{ i.po.project.io_number }}</a> <span class="ink2" style="font-size:12.5px">{{ i.po.project.title|truncatechars:30 }}</span></td>
+      <td><span class="rowacts"><a href="/invoices/{{ i.pk }}/edit/?next={{ request.get_full_path|urlencode }}">Edit</a>
+        <a href="/invoices/{{ i.pk }}/delete/?next={{ request.get_full_path|urlencode }}" style="color:var(--crit-ink)">Delete</a></span></td></tr>
+  {% empty %}<tr><td colspan="7" class="muted">No invoices match these filters.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% include "tracker/_pager.html" %}
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "tracker/base.html" %}
+{% block title %}Edit {{ form.instance.io_number }} – MBN Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/projects/{{ form.instance.pk }}/">{{ form.instance.io_number }}</a> › Edit</div>
+    <h1>Edit project details</h1>
+    <div class="sub">Fields marked <span class="req"></span> are required. Budget and schedule are changed through a new PCCF.</div></div>
+  <span class="spacer"></span><a class="btn" href="/projects/{{ form.instance.pk }}/">Cancel</a>
+</div>
+<form method="post" class="stack">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="panel">{% include "tracker/_project_fields.html" %}</div>
+  <div style="display:flex;gap:8px"><button class="btn primary">Save</button><a class="btn" href="/projects/{{ form.instance.pk }}/">Cancel</a></div>
+</form>
+{% endblock %}

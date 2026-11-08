@@ -1,0 +1,35 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/facilities/properties/">Properties</a> › {{ p.number }}</div>
+    <h1>{{ p.number }} · {{ p.name|default:"Unnamed property" }}</h1>
+    <div class="sub">{{ buildings|length }} building{{ buildings|length|pluralize }} · {{ rows|length }} project{{ rows|length|pluralize }}</div></div>
+  <span class="spacer"></span>
+  <a class="btn" href="/facilities/buildings/new/?property={{ p.number|urlencode }}">+ Building</a>
+  <a class="btn" href="/facilities/properties/{{ p.pk }}/edit/">Edit property</a>
+  <a class="btn ghost-danger" href="/facilities/properties/{{ p.pk }}/delete/">Delete</a>
+</div>
+{% if p.notes %}<div class="panel pre">{{ p.notes }}</div>{% endif %}
+<div class="grid g2">
+  <div>
+    <div class="panel-head"><h2>Buildings</h2></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Asset #</th><th>Name</th><th>Address</th><th class="n">Projects</th></tr></thead>
+      <tbody>{% for b in buildings %}
+        <tr><td><a href="/facilities/buildings/{{ b.pk }}/"><strong>{{ b.asset_number }}</strong></a></td><td>{{ b.name }}</td><td class="ink2">{{ b.address }}</td>
+          <td class="n">{% if b.project_count %}<span class="pill blue">{{ b.project_count }}</span>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="4" class="muted">No buildings.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+  <div>
+    <div class="panel-head"><h2>Projects on this property</h2></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Project</th><th>Building</th><th style="min-width:140px">Budget used</th><th class="n">Budget</th></tr></thead>
+      <tbody>{% for f in rows %}
+        <tr><td><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a><div class="ink2" style="font-size:12px">{{ f.project.title|truncatechars:34 }}</div></td>
+          <td>{{ f.project.building.asset_number }}</td><td>{% include "tracker/_budget_bar.html" with f=f %}</td><td class="n">{{ f.budget|money }}</td></tr>
+      {% empty %}<tr><td colspan="4" class="muted">No projects.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "tracker/base.html" %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/projects/">Projects</a> › New</div>
+    <h1>New project</h1>
+    <div class="sub">A project is created together with its charter (PCCF 0), the budget and schedule it was approved on.</div>
+    <div class="sub">Fields marked <span class="req"></span> are required. Everything else can be filled in later; empty amounts count as $0.</div></div>
+  <span class="spacer"></span><a class="btn" href="/projects/">Cancel</a>
+</div>
+
+<form method="post" class="stack">{% csrf_token %}
+  {% if form.non_field_errors or charter.non_field_errors %}<div class="msg error">{{ form.non_field_errors }}{{ charter.non_field_errors }}</div>{% endif %}
+
+  <div class="panel">
+    <div class="panel-head"><h2>1 · Project details</h2></div>
+    {% include "tracker/_project_fields.html" %}
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>2 · Charter · PCCF 0</h2><span class="spacer"></span>
+      <span class="balance-badge" aria-live="polite"></span></div>
+    {% include "tracker/_pccf_sections.html" with f=charter charter_required=True %}
+  </div>
+
+  <div style="display:flex;gap:8px"><button class="btn primary">Create project and charter</button><a class="btn" href="/projects/">Cancel</a></div>
+</form>
+
+<style>
+.cols-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 14px}
+.cols-form .full{grid-column:1/-1}
+</style>
+{% endblock %}

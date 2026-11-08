@@ -1,0 +1,6 @@
+{% load money %}<div class="bbar {% if r.remaining|neg %}over{% endif %}" data-tip="PO {{ r.po.number }} · {{ r.po.vendor }}
+Value {{ r.total|money:2 }}{% if r.pending %} (incl. {{ r.pending|money:2 }} pending){% endif %}
+Invoiced {{ r.invoiced|money:2 }} ({{ r.pct|floatformat:0 }}%)
+Remaining {{ r.remaining|money:2 }}">
+  {% if r.pct %}<span class="inv" style="width:{{ r.bar|floatformat:"2u" }}%"></span>{% endif %}
+</div>

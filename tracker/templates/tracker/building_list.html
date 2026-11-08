@@ -1,0 +1,32 @@
+{% extends "tracker/base.html" %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Facilities</h1><div class="sub">{{ total|floatformat:"0g" }} building{{ total|pluralize }}{% if prop %} on property {{ prop }}{% endif %} · {{ with_projects }} with projects</div></div>
+  <span class="spacer"></span>
+  <a class="btn primary" href="/facilities/buildings/new/{% if prop %}?property={{ prop }}{% endif %}">+ New building</a>
+</div>
+{% include "tracker/_fac_nav.html" with active="buildings" %}
+<form method="get" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+  <input name="q" value="{{ q }}" placeholder="Asset #, name, address, city or postal code" style="width:320px">
+  <input name="property" value="{{ prop }}" placeholder="Property #" style="width:130px">
+  <label class="btn" style="font-weight:500"><input type="checkbox" name="only" value="projects" {% if only == 'projects' %}checked{% endif %} onchange="this.form.submit()"> Only buildings with projects</label>
+  <button class="btn">Search</button>
+  {% if q or prop or only %}<a class="btn" href="/facilities/">Clear</a>{% endif %}
+</form>
+<div class="tablewrap"><table>
+  <thead><tr><th>Asset #</th><th>Name</th><th>Property</th><th>Address</th><th>City</th><th>Purpose</th>
+    <th class="n">Floors</th><th class="n">Built</th><th class="n">Area</th><th>Heritage</th><th class="n">Projects</th><th class="n">Contacts</th></tr></thead>
+  <tbody>{% for b in page %}
+    <tr><td><a href="/facilities/buildings/{{ b.pk }}/"><strong>{{ b.asset_number }}</strong></a></td>
+      <td>{{ b.name|truncatechars:40 }}</td>
+      <td>{% if b.property %}<a href="/facilities/properties/{{ b.property_id }}/">{{ b.property.number }}</a>{% endif %}</td>
+      <td>{{ b.address|truncatechars:32 }}</td><td>{{ b.city }}</td><td class="ink2">{{ b.purpose|truncatechars:20 }}</td>
+      <td class="n">{{ b.floors|default:"" }}</td><td class="n">{{ b.construction_year|default:"" }}</td>
+      <td class="n">{% if b.area %}{{ b.area|floatformat:"0g" }}{% endif %}</td>
+      <td>{% if b.heritage_status and b.heritage_status.name != 'Not Heritage' %}<span class="pill warn">{{ b.heritage_status }}</span>{% endif %}</td>
+      <td class="n">{% if b.project_count %}<span class="pill blue">{{ b.project_count }}</span>{% endif %}</td>
+      <td class="n">{{ b.role_count|default:"" }}</td></tr>
+  {% empty %}<tr><td colspan="12" class="muted">No buildings match.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% include "tracker/_pager.html" %}
+{% endblock %}

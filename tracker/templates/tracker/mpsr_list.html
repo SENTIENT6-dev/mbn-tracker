@@ -1,0 +1,39 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block title %}MPSR {{ period|date:"F Y" }} – MBN Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>MPSR · {{ period|date:"F Y" }}</h1>
+    <div class="sub">Go through each active project: check the figures, update the status comment, risk, forecast and value of work.</div></div>
+  <span class="spacer"></span>
+  <div class="seg">
+    <a href="?period={{ prev }}">‹ Previous month</a>
+    {% if not is_current %}<a href="?">This month</a>{% endif %}
+    <a href="?period={{ next }}">Next ›</a>
+  </div>
+  {% if first_pending %}<a class="btn primary" href="/mpsr/{{ first_pending.pk }}/?period={{ period|date:'Y-m' }}">{% if done_count %}Continue{% else %}Start MPSR{% endif %} →</a>{% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>{{ done_count }} of {{ total }} project{{ total|pluralize }} done</h2><span class="spacer"></span>
+    {% if done_count == total and total %}<span class="pill ok">✓ All done for {{ period|date:"F" }}</span>{% endif %}</div>
+  <div class="mpsr-progress"><span style="width:{{ pct|floatformat:"1u" }}%"></span></div>
+</div>
+
+<div class="tablewrap"><table>
+  <thead><tr><th style="width:36px"></th><th>Project</th><th>Stage</th><th style="min-width:170px">Budget used</th>
+    <th class="n">VOW</th><th>Last comment</th><th>Overdue</th><th></th></tr></thead>
+  <tbody>{% for f in rows %}
+    <tr class="{% if f.reviewed_at %}mpsr-done{% endif %}">
+      <td>{% if f.reviewed_at %}<span class="mark done" title="Done {{ f.reviewed_at|date:'Y-m-d H:i' }}">✓</span>{% else %}<span class="mark todo" title="Not done yet"></span>{% endif %}</td>
+      <td><a href="/mpsr/{{ f.project.pk }}/?period={{ period|date:'Y-m' }}"><strong>{{ f.project.io_number }}</strong></a>
+        <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:48 }}</div></td>
+      <td class="nowrap">{{ f.project.current_status.stage|default:"–" }}</td>
+      <td>{% include "tracker/_budget_bar.html" with f=f %}</td>
+      <td class="n">{{ f.vow_total|money }}<div class="muted" style="font-size:11.5px">{{ f.vow.reporting_date|default:"never" }}</div></td>
+      <td class="nowrap">{% if f.last_comment %}{{ f.last_comment|date:"Y-m-d" }}{% else %}<span class="muted">never</span>{% endif %}</td>
+      <td>{% if f.overdue %}<span class="pill overdue">✗ {{ f.overdue }}</span>{% endif %}</td>
+      <td class="nowrap"><a class="btn small {% if not f.reviewed_at %}primary{% endif %}" href="/mpsr/{{ f.project.pk }}/?period={{ period|date:'Y-m' }}">{% if f.reviewed_at %}Review again{% else %}Open{% endif %}</a></td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="muted">No active projects.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head"><h1>{{ title }}</h1></div>
+<div class="panel" style="max-width:680px">
+  {% if note %}<div class="banner">{{ note }}</div>{% endif %}
+  {% if impacts %}
+    <p><strong>This will also remove or change:</strong></p>
+    <table style="margin-bottom:16px">
+      {% for label, count, amount in impacts %}
+        <tr><td>{{ label }}</td><td class="n"><strong>{{ count }}</strong></td><td class="n ink2">{% if amount %}{{ amount|money:2 }}{% endif %}</td></tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p>Delete {{ what }}? Totals that include it update immediately.</p>
+  {% endif %}
+  {% if blocked %}
+  <a class="btn" href="{{ back }}">Back</a>
+  {% else %}
+  {% if error %}<div class="msg error">{{ error }}</div>{% endif %}
+  <form method="post" class="stack">{% csrf_token %}
+    {% for name, label, checked in options %}
+      <p><label style="display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)"><input type="checkbox" name="{{ name }}" {% if checked %}checked{% endif %}> {{ label }}</label></p>
+    {% endfor %}
+    {% if confirm_text %}
+      <p><label for="confirm">Type <strong>{{ confirm_text }}</strong> to confirm</label>
+        <input id="confirm" name="confirm" autocomplete="off" style="max-width:260px"></p>
+    {% endif %}
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn danger">Delete permanently</button>
+      <a class="btn" href="{{ back }}">Cancel</a>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

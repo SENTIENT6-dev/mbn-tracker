@@ -1,0 +1,140 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block title %}MPSR {{ project.io_number }} – MBN Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/mpsr/{{ q }}">MPSR · {{ period|date:"F Y" }}</a> › {{ project.io_number }}
+      {% if pos %}<span class="muted">· project {{ pos }} of {{ count }} · {{ done_count }} done</span>{% endif %}</div>
+    <h1>{{ project.io_number }} · {{ project.title }}</h1>
+    <div class="sub" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      {% if reviewed %}<span class="pill ok">✓ Done for {{ period|date:"F" }} · {{ reviewed.reviewed_at|date:"M j, H:i" }}</span>{% else %}<span class="pill warn">Not done for {{ period|date:"F" }} yet</span>{% endif %}
+      <span>{{ status.stage|default:"No stage set" }}</span>
+      {% if project.building %}<span>· {{ project.building }}</span>{% endif %}
+      <a href="/projects/{{ project.pk }}/">· Full project page</a>
+    </div>
+  </div>
+  <span class="spacer"></span>
+  <div class="seg">
+    {% if prev_id %}<a href="/mpsr/{{ prev_id }}/{{ q }}">‹ Previous</a>{% endif %}
+    <a href="/mpsr/{{ q }}">All projects</a>
+    {% if next_id %}<a href="/mpsr/{{ next_id }}/{{ q }}">Next ›</a>{% endif %}
+  </div>
+</div>
+
+<div class="grid mpsr-grid">
+  {# ---------------- left: what the PM needs to see #}
+  <div class="mpsr-facts">
+    <div class="panel">
+      <div class="panel-head"><h2>Budget</h2></div>
+      {% include "tracker/_budget_bar.html" with f=fin lg=True %}
+      <dl class="kv" style="margin-top:12px">
+        <dt>Budget incl. fee</dt><dd><strong>{{ fin.budget_with_fee|money }}</strong> <span class="muted">(PCCF {{ fin.pccf.submission|default:"–" }})</span></dd>
+        <dt>Committed</dt><dd>{{ fin.commitments|money }}{% if fin.pending %} + {{ fin.pending|money }} pending{% endif %}</dd>
+        <dt>Invoiced</dt><dd>{{ fin.invoiced|money }}</dd>
+        <dt>Uncommitted</dt><dd class="{% if fin.remaining_budget|neg %}neg{% endif %}">{{ fin.remaining_budget|money }}</dd>
+        <dt>Value of work</dt><dd>{{ fin.vow_total|money }} <span class="muted">as of {{ fin.vow.reporting_date|default:"never" }}</span></dd>
+        <dt>To be billed</dt><dd class="{% if fin.to_be_billed|neg %}neg{% endif %}">{{ fin.to_be_billed|money }}</dd>
+      </dl>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Cash flow</h2><span class="spacer"></span><span class="muted" style="font-size:12px">FY {{ status.fiscal_year_label|default:"–" }}</span></div>
+      <table class="compact">
+        <thead><tr><th></th><th class="n">Prev. yrs</th><th class="n">Q1</th><th class="n">Q2</th><th class="n">Q3</th><th class="n">Q4</th><th class="n">Next</th><th class="n">Future</th></tr></thead>
+        <tbody>
+          {% if fin.pccf %}<tr><td class="ink2">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{{ fin.pccf.q1|money }}</td><td class="n">{{ fin.pccf.q2|money }}</td><td class="n">{{ fin.pccf.q3|money }}</td><td class="n">{{ fin.pccf.q4|money }}</td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
+          <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n">{{ status.q1|money }}</td><td class="n">{{ status.q2|money }}</td><td class="n">{{ status.q3|money }}</td><td class="n">{{ status.q4|money }}</td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Milestones</h2></div>
+      <table class="compact">
+        <thead><tr><th></th><th>Approved</th><th>Forecast</th><th>Actual</th></tr></thead>
+        <tbody>{% for e in events %}
+          <tr><td>{{ e.label }}</td><td>{{ e.approved|default:"–" }}</td><td>{{ e.forecast|default:"–" }}</td>
+            <td>{% if e.actual %}<span class="mark done">✓</span>{{ e.actual }}{% elif e.css == 'missed' %}<span class="mark missed">✗</span><span class="neg">none</span>{% else %}–{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="4" class="muted">No milestone dates yet.</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+
+    {% if history %}
+    <div class="panel">
+      <div class="panel-head"><h2>Previous comments</h2></div>
+      {% for h in history %}
+        <div style="padding:7px 0;border-bottom:1px solid var(--line);font-size:13px">
+          <span class="pill">{{ h.get_kind_display }}</span> <span class="muted">{{ h.changed_at|date:"Y-m-d" }}</span>
+          <div class="pre" style="margin-top:3px">{{ h.text|truncatechars:240 }}</div></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# ---------------- right: what the PM updates #}
+  <form method="post" class="mpsr-form stack">{% csrf_token %}
+    <div class="panel">
+      <div class="panel-head"><h2>1 · Status comment</h2></div>
+      <p class="ink2" style="margin:-6px 0 8px;font-size:12.5px">What happened this month and what's next. Starts with the current comment; edit or replace it.</p>
+      {{ f.comment.text }}{{ f.comment.text.errors }}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>2 · Risk</h2></div>
+      <p class="ink2" style="margin:-6px 0 8px;font-size:12.5px">Risks to budget, schedule or scope, and how they're being handled.</p>
+      {{ f.risk.text }}{{ f.risk.text.errors }}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>3 · Stage &amp; actual dates</h2></div>
+      <div class="mpsr-row">
+        <p>{{ f.act.stage.label_tag }}{{ f.act.stage }}{{ f.act.stage.errors }}</p>
+        <p>{{ f.act.actual_design_end.label_tag }}{{ f.act.actual_design_end }}{{ f.act.actual_design_end.errors }}</p>
+        <p>{{ f.act.actual_construction_award.label_tag }}{{ f.act.actual_construction_award }}{{ f.act.actual_construction_award.errors }}</p>
+        <p>{{ f.act.actual_substantial.label_tag }}{{ f.act.actual_substantial }}{{ f.act.actual_substantial.errors }}</p>
+        <p>{{ f.act.actual_closeout.label_tag }}{{ f.act.actual_closeout }}{{ f.act.actual_closeout.errors }}</p>
+        <p class="check">{{ f.act.final_mpsr }} {{ f.act.final_mpsr.label_tag }}</p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>4 · Forecast dates</h2></div>
+      <div class="mpsr-row">
+        <p>{{ f.dates.design_end.label_tag }}{{ f.dates.design_end }}{{ f.dates.design_end.errors }}</p>
+        <p>{{ f.dates.construction_award.label_tag }}{{ f.dates.construction_award }}{{ f.dates.construction_award.errors }}</p>
+        <p>{{ f.dates.substantial.label_tag }}{{ f.dates.substantial }}{{ f.dates.substantial.errors }}</p>
+        <p>{{ f.dates.closeout.label_tag }}{{ f.dates.closeout }}{{ f.dates.closeout.errors }}</p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>5 · Forecast cash flow</h2><span class="spacer"></span>
+        <span class="pill {% if forecast_variance|abs <= 1 %}ok{% else %}warn{% endif %}" title="Forecast total vs budget incl. fee">
+          Forecast {{ forecast_total|money }} vs budget {{ fin.budget_with_fee|money }}{% if forecast_variance|abs > 1 %} · {% if not forecast_variance|neg %}+{% endif %}{{ forecast_variance|money }}{% endif %}</span></div>
+      <div class="mpsr-row">
+        <p>{{ f.cash.fiscal_year.label_tag }}{{ f.cash.fiscal_year }}{{ f.cash.fiscal_year.errors }}</p>
+        <p>{{ f.cash.previous.label_tag }}{{ f.cash.previous }}{{ f.cash.previous.errors }}</p>
+      </div>
+      <div class="mpsr-row q">
+        <p>{{ f.cash.q1.label_tag }}{{ f.cash.q1 }}{{ f.cash.q1.errors }}</p>
+        <p>{{ f.cash.q2.label_tag }}{{ f.cash.q2 }}{{ f.cash.q2.errors }}</p>
+        <p>{{ f.cash.q3.label_tag }}{{ f.cash.q3 }}{{ f.cash.q3.errors }}</p>
+        <p>{{ f.cash.q4.label_tag }}{{ f.cash.q4 }}{{ f.cash.q4.errors }}</p>
+        <p>{{ f.cash.next_year.label_tag }}{{ f.cash.next_year }}{{ f.cash.next_year.errors }}</p>
+        <p>{{ f.cash.future.label_tag }}{{ f.cash.future }}{{ f.cash.future.errors }}</p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>6 · Value of work</h2></div>
+      <div class="mpsr-row">
+        <p>{{ f.vow.reporting_date.label_tag }}{{ f.vow.reporting_date }}{{ f.vow.reporting_date.errors }}</p>
+        <p>{{ f.vow.previous_years_with_fees.label_tag }}{{ f.vow.previous_years_with_fees }}<span class="helptext">{{ f.vow.previous_years_with_fees.help_text }}</span>{{ f.vow.previous_years_with_fees.errors }}</p>
+        <p>{{ f.vow.current_year_no_fees.label_tag }}{{ f.vow.current_year_no_fees }}<span class="helptext">{{ f.vow.current_year_no_fees.help_text }}</span>{{ f.vow.current_year_no_fees.errors }}</p>
+      </div>
+      <p class="muted" style="font-size:12px;margin:4px 0 0">A new value-of-work entry is only recorded when these numbers change.</p>
+    </div>
+
+    <div class="mpsr-actions">
+      <button class="btn primary" name="save_next" value="1">Save &amp; next project →</button>
+      <button class="btn" name="save" value="1">Save</button>
+      {% if next_id %}<a class="btn" href="/mpsr/{{ next_id }}/{{ q }}">Skip</a>{% endif %}
+      <span class="muted" style="font-size:12px">Saving marks this project done for {{ period|date:"F" }}, even with no changes.</span>
+    </div>
+  </form>
+</div>
+{% endblock %}

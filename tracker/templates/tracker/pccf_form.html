@@ -1,0 +1,18 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ title }} – MBN Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/projects/{{ project.pk }}/?tab=budget">{{ project.io_number }} · {{ project.title|truncatechars:50 }}</a> › PCCF</div>
+    <h1>{{ heading }}</h1>
+    <div class="sub">{% if is_new %}The submission number is assigned automatically when you save.{% if prefilled %} Values start from PCCF {{ prefilled }}; change what's different.{% endif %}{% endif %}</div></div>
+  <span class="spacer"></span><a class="btn" href="{{ back }}">Cancel</a>
+</div>
+<form method="post" class="stack">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="panel">
+    <div class="panel-head"><h2>Budget, schedule &amp; cash flow</h2><span class="spacer"></span><span class="balance-badge" aria-live="polite"></span></div>
+    {% include "tracker/_pccf_sections.html" with f=form %}
+  </div>
+  <div style="display:flex;gap:8px"><button class="btn primary">Save</button><a class="btn" href="{{ back }}">Cancel</a></div>
+</form>
+{% endblock %}

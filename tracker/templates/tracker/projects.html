@@ -1,0 +1,45 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Projects</h1><div class="sub">{{ rows|length }} project{{ rows|pluralize }} · budget {{ totals.budget|money }} · committed {{ totals.commitments|money }} · invoiced {{ totals.invoiced|money }}</div></div>
+  <span class="spacer"></span>
+  <div class="seg">
+    <a href="?show=active&q={{ q|urlencode }}" class="{% if show == 'active' %}on{% endif %}">Active &amp; on hold</a>
+    <a href="?show=all&q={{ q|urlencode }}" class="{% if show == 'all' %}on{% endif %}">All</a>
+  </div>
+  <form method="get"><input type="hidden" name="show" value="{{ show }}"><input name="q" value="{{ q }}" placeholder="Search number or title" style="width:220px"></form>
+  <a class="btn primary" href="/projects/new/">+ New project</a>
+</div>
+
+<div class="tablewrap">
+<table>
+  <thead><tr>
+    <th>Project</th><th>Status</th><th>Stage</th><th style="min-width:210px">Budget used</th>
+    <th class="n">Budget (no fee)</th><th class="n">Committed</th><th class="n">Invoiced</th><th class="n">VOW</th>
+    <th class="n">Uncommitted</th><th>Health</th><th>Next milestone</th>
+  </tr></thead>
+  <tbody>
+  {% for f in rows %}
+    <tr>
+      <td><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a>
+        <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:40 }}</div></td>
+      <td><span class="pill {% if f.project.status == 1 %}blue{% endif %}">{{ f.project.get_status_display }}</span></td>
+      <td class="nowrap">{{ f.project.current_status.stage|default:"–" }}</td>
+      <td>{% include "tracker/_budget_bar.html" with f=f %}</td>
+      <td class="n">{{ f.budget|money }}</td>
+      <td class="n">{{ f.commitments|money }}</td>
+      <td class="n">{{ f.invoiced|money }}</td>
+      <td class="n">{{ f.vow_total|money }}</td>
+      <td class="n {% if f.remaining_budget|neg %}neg{% endif %}">{{ f.remaining_budget|money }}</td>
+      <td class="nowrap">{% include "tracker/_health.html" with f=f %}</td>
+      <td class="nowrap">{% if f.schedule.next %}{{ f.schedule.next.label }}<div class="ink2" style="font-size:12px">{{ f.schedule.next.date }}</div>{% else %}<span class="muted">–</span>{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="11" class="muted">No projects match.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div class="legend" style="margin-top:10px"><span><i style="background:var(--seq-1)"></i>Invoiced</span><span><i style="background:var(--seq-2)"></i>Committed, not invoiced</span>
+  <span><i class="lg-pen"></i>Pending COs</span><span><i class="lg-ovr"></i>Over budget</span><span class="muted">· full bar = budget (no fee)</span></div>
+{% endblock %}

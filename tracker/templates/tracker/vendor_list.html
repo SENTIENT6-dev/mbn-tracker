@@ -1,0 +1,34 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Vendors &amp; companies</h1><div class="sub">{{ total }} compan{{ total|pluralize:"y,ies" }} · consultants, contractors, clients and others</div></div>
+  <span class="spacer"></span>
+  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
+    <select name="type" onchange="this.form.submit()"><option value="">All types</option>
+      {% for t in types %}<option value="{{ t.pk }}" {% if kind == t.pk|stringformat:"s" %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
+    <select name="sort" onchange="this.form.submit()">
+      <option value="committed" {% if sort == 'committed' %}selected{% endif %}>Sort: committed $</option>
+      <option value="invoiced" {% if sort == 'invoiced' %}selected{% endif %}>Sort: invoiced $</option>
+      <option value="pos" {% if sort == 'pos' %}selected{% endif %}>Sort: number of POs</option>
+      <option value="name" {% if sort == 'name' %}selected{% endif %}>Sort: name</option></select>
+    <input name="q" value="{{ q }}" placeholder="Name, vendor # or acronym" style="width:220px">
+  </form>
+  <a class="btn primary" href="/vendors/new/">+ New vendor</a>
+</div>
+<div class="tablewrap"><table>
+  <thead><tr><th>Company</th><th>Type</th><th class="n">POs</th><th class="n">Projects</th><th style="min-width:200px">Committed vs invoiced</th>
+    <th class="n">Committed</th><th class="n">Invoiced</th><th class="n">Contacts</th></tr></thead>
+  <tbody>{% for c in page %}
+    <tr><td><a href="/vendors/{{ c.pk }}/"><strong>{{ c.name }}</strong></a>{% if c.vendor_number %}<div class="ink2" style="font-size:12px">Vendor # {{ c.vendor_number }}</div>{% endif %}</td>
+      <td>{% if c.company_type %}<span class="pill">{{ c.company_type }}</span>{% endif %}</td>
+      <td class="n">{{ c.po_count|default:"" }}</td><td class="n">{{ c.project_count|default:"" }}</td>
+      <td>{% if c.committed %}<div class="bbar" data-tip="{{ c.name }}
+Committed {{ c.committed|money }}
+Invoiced {{ c.invoiced|money }}"><span class="inv" style="width:{{ c.inv_bar|floatformat:"2u" }}%"></span><span class="com" style="width:{{ c.com_bar|floatformat:"2u" }}%"></span></div>{% endif %}</td>
+      <td class="n">{% if c.committed %}{{ c.committed|money }}{% endif %}</td><td class="n">{% if c.invoiced %}{{ c.invoiced|money }}{% endif %}</td>
+      <td class="n">{{ c.people_count|default:"" }}</td></tr>
+  {% empty %}<tr><td colspan="8" class="muted">No companies match.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="legend" style="margin-top:10px"><span><i style="background:var(--seq-1)"></i>Invoiced</span><span><i style="background:var(--seq-2)"></i>Committed, not invoiced</span><span class="muted">Bars are relative to the largest vendor on this page</span></div>
+{% include "tracker/_pager.html" %}
+{% endblock %}

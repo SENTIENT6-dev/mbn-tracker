@@ -1,0 +1,15 @@
+# Real data never goes in the repo
+*.sqlite3
+*.sqlite3-journal
+*.accdb
+*.mdb
+*.xlsx
+tracker/management/commands/_local_fixes.py
+
+# Local environment
+.venv/
+__pycache__/
+*.pyc
+staticfiles/
+.claude/
+.env

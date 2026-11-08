@@ -1,0 +1,22 @@
+{% extends "tracker/base.html" %}
+{% block content %}
+<div class="page-head"><div><div class="ink2" style="font-size:13px"><a href="/invoices/">Invoices</a> › New</div><h1>Add invoice</h1></div>
+  <span class="spacer"></span><a class="btn" href="/invoices/">Cancel</a></div>
+<div class="panel" style="max-width:760px">
+  <form method="post" class="stack">{% csrf_token %}
+    {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
+    <p>{{ form.po.label_tag }}{{ form.po }}{{ form.po.errors }}<span class="helptext">Pick the PO being billed. The invoice counts toward that PO's vendor and project.</span></p>
+    {% include "tracker/_invoice_room.html" %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 12px">
+      <p>{{ form.number.label_tag }}{{ form.number }}{{ form.number.errors }}</p>
+      <p>{{ form.amount.label_tag }}{{ form.amount }}{{ form.amount.errors }}</p>
+      <p>{{ form.date.label_tag }}{{ form.date }}{{ form.date.errors }}</p>
+    </div>
+    {% if form.confirm_duplicate.field.widget.input_type == 'checkbox' %}
+      <p><label style="display:flex;gap:6px;align-items:center;color:var(--ink);font-size:14px">{{ form.confirm_duplicate }} {{ form.confirm_duplicate.label }}</label></p>
+    {% else %}{{ form.confirm_duplicate }}{% endif %}
+    <div style="display:flex;gap:8px"><button class="btn primary js-save">Save invoice</button><button class="btn js-save" name="add_another" value="1">Save and add another</button></div>
+    <div class="room-msg" role="alert"></div>
+  </form>
+</div>
+{% endblock %}

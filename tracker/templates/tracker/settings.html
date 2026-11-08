@@ -1,0 +1,34 @@
+{% extends "tracker/base.html" %}
+{% block title %}Settings – MBN Tracker{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Settings</h1>
+  <div class="sub">This tracker belongs to {{ me }}. {{ project_count }} project{{ project_count|pluralize }}.</div></div></div>
+
+<div class="grid g2">
+  <form method="post" class="panel stack">{% csrf_token %}
+    <div class="panel-head"><h2>About you</h2></div>
+    <p class="ink2" style="margin-top:-6px">You're the project manager on every project here. Changing your name updates all of them.</p>
+    {{ profile.non_field_errors }}
+    <div class="owner-grid">
+      <p>{{ profile.first_name.label_tag }}{{ profile.first_name }}{{ profile.first_name.errors }}</p>
+      <p>{{ profile.last_name.label_tag }}{{ profile.last_name }}{{ profile.last_name.errors }}</p>
+      <p>{{ profile.email.label_tag }}{{ profile.email }}{{ profile.email.errors }}</p>
+      <p>{{ profile.phone.label_tag }}{{ profile.phone }}{{ profile.phone.errors }}</p>
+      <p>{{ profile.position.label_tag }}{{ profile.position }}{{ profile.position.errors }}</p>
+    </div>
+    <div><button class="btn primary" name="save_profile" value="1">Save my details</button></div>
+  </form>
+
+  <form method="post" class="panel stack" onsubmit="if(event.submitter&&event.submitter.name==='run_import'){event.submitter.disabled=true;event.submitter.textContent='Importing… this takes about a minute'}">{% csrf_token %}
+    <div class="panel-head"><h2>Reload from Access</h2></div>
+    <p class="ink2" style="margin-top:-6px">Use this when you get a newer copy of the MBN Access database.{% if owner.access_source %} Last loaded from <code>{{ owner.access_source }}</code>.{% endif %}</p>
+    {% include "tracker/_import_fields.html" with imp=imp %}
+    <div><button class="btn" name="run_import" value="1">Import from Access</button></div>
+  </form>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>Also here</h2></div>
+  <p><a href="/issues/">Data issues</a> from the Access import</p>
+</div>
+{% endblock %}

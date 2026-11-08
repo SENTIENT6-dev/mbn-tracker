@@ -1,0 +1,9 @@
+{% if page.has_other_pages %}
+<div class="pager">
+  <span class="ink2">{{ page.start_index }}–{{ page.end_index }} of {{ page.paginator.count|floatformat:"0g" }}</span>
+  <span style="flex:1"></span>
+  {% if page.has_previous %}<a class="btn small" href="?{{ qs }}&page=1">« First</a><a class="btn small" href="?{{ qs }}&page={{ page.previous_page_number }}">‹ Prev</a>{% endif %}
+  <span class="ink2">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn small" href="?{{ qs }}&page={{ page.next_page_number }}">Next ›</a><a class="btn small" href="?{{ qs }}&page={{ page.paginator.num_pages }}">Last »</a>{% endif %}
+</div>
+{% endif %}

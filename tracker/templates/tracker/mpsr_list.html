@@ -10,6 +10,7 @@
     {% if not is_current %}<a href="?">This month</a>{% endif %}
     <a href="?period={{ next }}">Next ›</a>
   </div>
+  <a class="btn" href="/reports/monthly/?period={{ period|date:'Y-m' }}">Monthly report</a>
   {% if first_pending %}<a class="btn primary" href="/mpsr/{{ first_pending.pk }}/?period={{ period|date:'Y-m' }}">{% if done_count %}Continue{% else %}Start MPSR{% endif %} →</a>{% endif %}
 </div>
 

@@ -1,0 +1,140 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block title %}Monthly report {{ r.first|date:"F Y" }} – IO PM Tracker{% endblock %}
+{% block head %}
+<style>
+.report h2.sec{font-size:15px;margin:22px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.report .counts{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}
+.report table td,.report table th{vertical-align:top}
+.report .act-list{margin:0;padding-left:18px;font-size:13px}
+.report .act-list li{margin-bottom:3px}
+.report .comment{font-size:12.5px;white-space:pre-line;color:var(--ink)}
+.report .meta{font-size:12.5px;color:var(--ink-2)}
+@media print{
+  @page{size:landscape;margin:12mm}
+  aside,.no-print,.msg,#tip{display:none !important}
+  body{background:#fff !important;color:#000}
+  main{margin:0 !important;padding:0 !important;max-width:none !important}
+  .panel,.tile{box-shadow:none !important;break-inside:avoid}
+  .report h2.sec{break-after:avoid}
+  .report tr{break-inside:avoid}
+  .tablewrap{overflow:visible !important}
+  a{color:inherit !important;text-decoration:none !important}
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="report">
+<div class="page-head">
+  <div><h1>Monthly report · {{ r.first|date:"F Y" }}</h1>
+    <div class="sub">{% if r.owner %}{{ r.owner.person }} · {% endif %}{{ r.rows|length }} active and on-hold project{{ r.rows|length|pluralize }} · generated {{ r.generated|date:"Y-m-d H:i" }}</div></div>
+  <span class="spacer"></span>
+  <div class="seg no-print"><a href="?period={{ prev }}">‹ Previous month</a><a href="?period={{ next }}">Next ›</a></div>
+  <a class="btn no-print" href="/reports/monthly.xlsx{{ q }}">Download Excel</a>
+  <button class="btn primary no-print" type="button" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="tiles">
+  <div class="tile"><div class="k">Total budget incl. fee</div><div class="v">{{ r.totals.budget_with_fee|money }}</div>
+    <div class="d">{{ r.totals.budget|money }} before fee</div></div>
+  <div class="tile"><div class="k">Committed</div><div class="v">{{ r.totals.commitments|money }}</div>
+    <div class="d">{% if r.totals.pending %}+ {{ r.totals.pending|money }} pending COs{% else %}no pending COs{% endif %}</div></div>
+  <div class="tile"><div class="k">Invoiced</div><div class="v">{{ r.totals.invoiced|money }}</div>
+    <div class="d">value of work {{ r.totals.vow_total|money }}</div></div>
+  <div class="tile"><div class="k">MPSR {{ r.first|date:"F" }}</div><div class="v">{{ r.mpsr_done }} / {{ r.rows|length }}</div>
+    <div class="d">projects done</div></div>
+</div>
+
+<div class="counts">
+  <span class="pill {% if r.pccf_rows %}warn{% else %}ok{% endif %}">PCCF required: {{ r.pccf_rows|length }}</span>
+  <span class="pill {% if r.kpi_issue_count %}over{% else %}ok{% endif %}">KPI issues: {{ r.kpi_issue_count }}</span>
+  <span class="pill {% if r.kpi_failure_count %}crit{% else %}ok{% endif %}">KPI failures: {{ r.kpi_failure_count }}</span>
+  <span class="pill {% if r.approaching %}blue{% else %}ok{% endif %}">Approaching targets: {{ r.approaching|length }}</span>
+  <span class="pill {% if r.overdue_count %}overdue{% else %}ok{% endif %}">Overdue milestones: {{ r.overdue_count }}</span>
+  <span class="pill {% if r.over_budget_rows %}over{% else %}ok{% endif %}">Over budget: {{ r.over_budget_rows|length }}</span>
+  <span class="pill {% if r.underspent_rows %}warn{% else %}ok{% endif %}">Under-spent: {{ r.underspent_rows|length }}</span>
+  <span class="pill">Stage changes: {{ r.stage_changes|length }}</span>
+</div>
+
+<h2 class="sec">Needs a decision</h2>
+<div class="grid g2">
+  <div class="panel">
+    <div class="panel-head"><h2>PCCF required ({{ r.pccf_rows|length }})</h2></div>
+    {% for row in r.pccf_rows %}
+      <div style="margin-bottom:8px"><strong>{{ row.project.io_number }}</strong> <span class="meta">{{ row.project.title }}</span>
+        <ul class="act-list">{% for x in row.fin.pccf_reasons %}<li>{{ x.text }}</li>{% endfor %}</ul></div>
+    {% empty %}<p class="muted">None: every forecast matches its approved PCCF.</p>{% endfor %}
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>KPI issues ({{ r.kpi_issue_count }})</h2></div>
+    {% for row in r.kpi_issue_rows %}
+      <div style="margin-bottom:8px"><strong>{{ row.project.io_number }}</strong> <span class="meta">{{ row.project.title }}</span>
+        <ul class="act-list">{% for i in row.fin.kpi_issues %}<li>{{ i.text }}</li>{% endfor %}</ul></div>
+    {% empty %}<p class="muted">None.</p>{% endfor %}
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Approaching targets, next 15 days ({{ r.approaching|length }})</h2></div>
+    <ul class="act-list">{% for w, f in r.approaching %}<li><strong>{{ f.project.io_number }}</strong> {{ w.text }}</li>
+    {% empty %}<li class="muted" style="list-style:none;margin-left:-18px">None.</li>{% endfor %}</ul>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Budget</h2></div>
+    <p class="meta" style="margin:0 0 4px">Over budget ({{ r.over_budget_rows|length }})</p>
+    <ul class="act-list">{% for row in r.over_budget_rows %}<li><strong>{{ row.project.io_number }}</strong> {{ row.project.title|truncatechars:50 }}: over by {{ row.fin.remaining_budget|abs|money }}</li>
+    {% empty %}<li class="muted" style="list-style:none;margin-left:-18px">None.</li>{% endfor %}</ul>
+    <p class="meta" style="margin:10px 0 4px">Under-spent so far this year ({{ r.underspent_rows|length }})</p>
+    <ul class="act-list">{% for row in r.underspent_rows %}<li><strong>{{ row.project.io_number }}</strong> {{ row.project.title|truncatechars:50 }}</li>
+    {% empty %}<li class="muted" style="list-style:none;margin-left:-18px">None.</li>{% endfor %}</ul>
+  </div>
+</div>
+
+{% if r.kpi_failures_this_month %}
+<h2 class="sec">KPI failures recorded in {{ r.first|date:"F" }}</h2>
+<div class="tablewrap"><table class="compact">
+  <thead><tr><th>Project</th><th>Target</th><th>Date</th><th>Reason</th></tr></thead>
+  <tbody>{% for k in r.kpi_failures_this_month %}
+    <tr><td><strong>{{ k.project.io_number }}</strong> <span class="meta">{{ k.project.title|truncatechars:40 }}</span></td>
+      <td class="nowrap">{{ k.get_milestone_display }} {{ k.target }}</td><td class="nowrap">{{ k.marked_at|date:"Y-m-d" }}</td><td>{{ k.note }}</td></tr>
+  {% endfor %}</tbody></table></div>
+{% endif %}
+
+<h2 class="sec">Stage changes in {{ r.first|date:"F" }}</h2>
+{% if r.stage_changes %}
+<div class="tablewrap"><table class="compact">
+  <thead><tr><th>Project</th><th>Date</th><th>From</th><th>To</th></tr></thead>
+  <tbody>{% for c in r.stage_changes %}
+    <tr><td><strong>{{ c.project.io_number }}</strong> <span class="meta">{{ c.project.title|truncatechars:50 }}</span></td>
+      <td class="nowrap">{{ c.when }}</td><td>{{ c.before }}</td><td><strong>{{ c.after }}</strong></td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}<p class="muted">No stage changes recorded this month.</p>{% endif %}
+
+<h2 class="sec">Projects</h2>
+<div class="tablewrap"><table class="compact">
+  <thead><tr><th>Project</th><th>Stage</th><th class="n">Budget incl. fee</th><th class="n">Committed</th><th class="n">Invoiced</th>
+    <th class="n">Uncommitted</th><th>Flags</th><th>MPSR</th></tr></thead>
+  <tbody>{% for row in r.rows %}
+    <tr><td><strong>{{ row.project.io_number }}</strong><div class="meta">{{ row.project.title|truncatechars:46 }}</div></td>
+      <td class="nowrap">{{ row.stage|default:"–" }}</td>
+      <td class="n">{{ row.fin.budget_with_fee|money }}</td><td class="n">{{ row.fin.commitments|money }}</td>
+      <td class="n">{{ row.fin.invoiced|money }}</td>
+      <td class="n {% if row.fin.remaining_budget|neg %}neg{% endif %}">{{ row.fin.remaining_budget|money }}</td>
+      <td>{% include "tracker/_health.html" with f=row.fin %}
+        {% if row.fin.pccf_required %}<span class="pill warn">PCCF</span>{% endif %}
+        {% if row.fin.kpi_issues %}<span class="pill over">KPI issue{{ row.fin.kpi_issues|length|pluralize }}</span>{% endif %}
+        {% if row.fin.kpi_failures %}<span class="pill crit">KPI failure{{ row.fin.kpi_failures|length|pluralize }}</span>{% endif %}
+        {% if row.underspent %}<span class="pill warn">Under-spent</span>{% endif %}</td>
+      <td class="nowrap">{% if row.mpsr_done %}<span class="pill ok">✓ Done</span>{% else %}<span class="pill none">Not done</span>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td><td></td><td class="n">{{ r.totals.budget_with_fee|money }}</td><td class="n">{{ r.totals.commitments|money }}</td>
+    <td class="n">{{ r.totals.invoiced|money }}</td><td class="n">{{ r.totals.remaining_budget|money }}</td><td></td><td></td></tr></tfoot>
+</table></div>
+
+<h2 class="sec">Status comments</h2>
+<div class="tablewrap"><table class="compact">
+  <thead><tr><th style="width:190px">Project</th><th style="width:90px">Updated</th><th>Comment</th></tr></thead>
+  <tbody>{% for row in r.rows %}
+    <tr><td><strong>{{ row.project.io_number }}</strong><div class="meta">{{ row.project.title|truncatechars:40 }}</div></td>
+      <td class="nowrap">{{ row.comment_date|default:"–" }}</td>
+      <td class="comment">{{ row.comment|default:"No comment yet." }}</td></tr>
+  {% endfor %}</tbody></table></div>
+</div>
+{% endblock %}

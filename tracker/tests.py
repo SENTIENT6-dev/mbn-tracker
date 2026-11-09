@@ -1011,6 +1011,40 @@ class BudgetHealthTests(Base):
         self.assertEqual(self._health(), "over")
 
 
+class MonthlyReportTests(Base):
+    def test_report_page_and_excel(self):
+        from io import BytesIO
+        from openpyxl import load_workbook
+        from .models import MPSRReview, StageGate
+        design = StageGate.objects.create(name="99% Design", order=4)
+        tender = StageGate.objects.create(name="Tender", order=5)
+        when = dt.datetime(2026, 11, 3, 10, tzinfo=dt.timezone.utc)
+        StatusHistory.objects.create(project=self.p, kind="actuals", changed_at=when - dt.timedelta(days=40),
+                                     data={"stage": design.name})
+        StatusHistory.objects.create(project=self.p, kind="actuals", changed_at=when, data={"stage": tender.name})
+        StatusHistory.objects.create(project=self.p, kind="comment", changed_at=when, text="Tender out next week.")
+        MPSRReview.objects.create(project=self.p, period=dt.date(2026, 11, 1))
+
+        r = self.client.get("/reports/monthly/?period=2026-11")
+        rep = r.context["r"]
+        self.assertEqual((rep.first, rep.last), (dt.date(2026, 11, 1), dt.date(2026, 11, 30)))
+        self.assertEqual([(c.before, c.after) for c in rep.stage_changes], [("99% Design", "Tender")])
+        self.assertEqual(rep.mpsr_done, 1)
+        self.assertEqual(len(rep.pccf_rows), 1)                       # base forecast differs from the PCCF
+        self.assertContains(r, "Tender out next week.")
+        self.assertContains(r, "Print / Save as PDF")
+        self.assertEqual(self.client.get("/reports/monthly/?period=2026-10").context["r"].stage_changes, [])
+
+        x = self.client.get("/reports/monthly.xlsx?period=2026-11")
+        self.assertIn("Monthly report 2026-11.xlsx", x["Content-Disposition"])
+        wb = load_workbook(BytesIO(x.content))
+        self.assertEqual(wb.sheetnames, ["Summary", "Projects", "Actions", "Stage changes"])
+        self.assertEqual(wb["Projects"]["A2"].value, "1000001")
+        self.assertEqual(wb["Projects"]["E2"].value, 605000)           # budget incl. fee
+        self.assertIn("PCCF required", [c.value for c in wb["Actions"]["C"]])
+        self.assertEqual(wb["Stage changes"]["E2"].value, "Tender")
+
+
 class BackupTests(TransactionTestCase):
     """Backups go to a temporary folder; the test database lives in memory, so it's allowed explicitly.
     (A TransactionTestCase: copying the database waits forever on the open transaction a TestCase keeps.)"""

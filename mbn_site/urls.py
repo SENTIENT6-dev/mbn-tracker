@@ -4,6 +4,7 @@ from django.urls import path
 from tracker import views as v
 from tracker import views_manage as m
 from tracker import views_mpsr as mp
+from tracker import views_report as rp
 from tracker import setup as site
 from tracker import views_owner as o
 
@@ -13,6 +14,8 @@ urlpatterns = [
     path("mpsr/", mp.mpsr_list, name="mpsr"),
     path("mpsr/<int:pk>/", mp.mpsr_project, name="mpsr_project"),
     path("mpsr/rollover/", mp.rollover, name="rollover"),
+    path("reports/monthly/", rp.report_page, name="report_monthly"),
+    path("reports/monthly.xlsx", rp.report_xlsx, name="report_monthly_xlsx"),
 
     # projects
     path("projects/", v.dashboard, name="projects"),

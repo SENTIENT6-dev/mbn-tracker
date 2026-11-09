@@ -1,5 +1,5 @@
 @echo off
-rem Starts MBN Tracker and opens it in your browser. Close this window to stop it.
+rem Starts IO PM Tracker and opens it in your browser. Close this window to stop it.
 cd /d "%~dp0"
 rem Creates or updates the database if needed (a fresh copy starts empty and asks who you are)
 ".venv\Scripts\python.exe" manage.py migrate -v 0

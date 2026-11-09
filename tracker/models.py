@@ -1,4 +1,4 @@
-"""Data model for the MBN project tracker (replacement for MBN.accdb).
+"""Data model for IO PM Tracker (replacement for MBN.accdb).
 
 Compared with the Access file, every link between tables is enforced and the
 keys that must be unique (project numbers, PCCF submission numbers, PO numbers,

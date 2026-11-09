@@ -1,4 +1,4 @@
-# MBN Tracker
+# IO PM Tracker
 
 Replacement for `MBN.accdb`: projects, PCCF budgets, POs, invoices, change orders and MPSR status,
 as a local web app (Python + Django + SQLite). Data lives in `db.sqlite3` in this folder.

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in – MBN Tracker</title>
+<title>Sign in – IO PM Tracker</title>
 <style>
   :root{--bg:#f6f7f9;--card:#fff;--ink:#1d2330;--ink2:#5b6474;--line:#dfe3ea;--acc:#2a78d6;--crit:#b42318;--critbg:#fdecea}
   @media (prefers-color-scheme: dark){:root{--bg:#14171d;--card:#1c2028;--ink:#e8ebf1;--ink2:#9aa3b2;--line:#2c323d;--acc:#5b9cf0;--crit:#f97066;--critbg:#3a1d1b}}
@@ -19,7 +19,7 @@
 </style></head>
 <body>
   <form method="post" class="card">{% csrf_token %}
-    <h1>MBN Tracker</h1>
+    <h1>IO PM Tracker</h1>
     <p>Enter the password to continue.</p>
     {% if error %}<div class="err" role="alert">That password isn't right.</div>{% endif %}
     <input type="hidden" name="next" value="{{ next }}">

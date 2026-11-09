@@ -1011,6 +1011,47 @@ class BudgetHealthTests(Base):
         self.assertEqual(self._health(), "over")
 
 
+class SpendByQuarterTests(Base):
+    """Base project: PCCF fee 10%. Forecast for FY 2026/27 (Apr 2026 - Mar 2027)."""
+
+    def setUp(self):
+        super().setUp()
+        ProjectStatus.objects.filter(project=self.p).update(
+            fiscal_year=2027, q1=D("10000"), q2=D("20000"), q3=D("30000"), q4=D("40000"))
+        for n, (day, amount) in enumerate([(dt.date(2026, 5, 10), "5000"), (dt.date(2026, 6, 30), "4000"),
+                                           (dt.date(2026, 8, 1), "9000"), (dt.date(2026, 11, 2), "1000"),
+                                           (dt.date(2026, 3, 31), "777")]):          # last one: previous FY
+            Invoice.objects.create(po=self.po1, number=f"I{n}", amount=D(amount), date=day)
+
+    def _spend(self, today):
+        from .services import spend_by_quarter
+        p = Project.objects.get(pk=self.p.pk)
+        return spend_by_quarter(p, p.current_status, p.latest_pccf(), today)
+
+    def test_quarters_and_actuals_include_fee(self):
+        from .services import fiscal_quarters
+        self.assertEqual(fiscal_quarters(2027)[0][1:], (dt.date(2026, 4, 1), dt.date(2026, 6, 30)))
+        self.assertEqual(fiscal_quarters(2027)[3][1:], (dt.date(2027, 1, 1), dt.date(2027, 3, 31)))
+        s = self._spend(dt.date(2026, 11, 15))
+        q = {r["label"]: r for r in s["quarters"]}
+        self.assertEqual([q[k]["state"] for k in ("Q1", "Q2", "Q3", "Q4")], ["done", "done", "now", "later"])
+        self.assertEqual((q["Q1"]["invoiced"], q["Q1"]["actual"]), (D("9000"), D("9900.00")))   # + 10% fee
+        self.assertEqual(q["Q2"]["difference"], D("9900.00") - D("20000"))
+        self.assertIsNone(q["Q3"]["difference"])                       # in progress: not compared yet
+        self.assertEqual((s["forecast_so_far"], s["actual_so_far"]), (D("30000"), D("19800.00")))
+
+    def test_underspend_flag(self):
+        self.assertTrue(self._spend(dt.date(2026, 11, 15))["underspent"])    # 19,800 vs 30,000 so far
+        self.assertFalse(self._spend(dt.date(2026, 5, 15))["underspent"])    # no quarter has ended yet
+        ProjectStatus.objects.filter(project=self.p).update(q1=D("9900"), q2=D("9900"))
+        self.assertFalse(self._spend(dt.date(2026, 11, 15))["underspent"])   # forecast matches spend
+
+    def test_shown_on_project_page(self):
+        r = self.client.get(f"/projects/{self.p.pk}/")
+        self.assertContains(r, "Actual = invoices dated in each quarter plus the 10.00% fee")
+        self.assertEqual(len(r.context["spend"]["quarters"]), 4)
+
+
 class RolloverTests(Base):
     """Base project: forecast Q1 10 + Q2 20; PCCF 0 approves Q1 1,000 + Q2 2,000."""
 

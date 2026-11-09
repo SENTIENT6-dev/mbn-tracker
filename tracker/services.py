@@ -90,6 +90,50 @@ def approved_cash_for_year(pccf, fiscal_year):
     return approved_for_year(pccf, fiscal_year)["year"]
 
 
+UNDERSPEND_SHARE = Decimal("0.10")   # flag when spend so far this year trails the forecast by more than 10%
+
+
+def fiscal_quarters(fiscal_year):
+    """[(label, first day, last day)] for a fiscal year stored by the year it ends (2027 = Apr 2026 - Mar 2027)."""
+    from datetime import date
+    y = fiscal_year - 1
+    return [("Q1", date(y, 4, 1), date(y, 6, 30)), ("Q2", date(y, 7, 1), date(y, 9, 30)),
+            ("Q3", date(y, 10, 1), date(y, 12, 31)), ("Q4", date(y + 1, 1, 1), date(y + 1, 3, 31))]
+
+
+def spend_by_quarter(project, status, pccf, today=None):
+    """Forecast vs actual spend per fiscal quarter of the forecast's year.
+
+    Actual = invoices dated in the quarter, plus the PCCF fee %, so it compares with the cash flow (which
+    includes the fee). Quarters that have ended count towards "so far"; the current one is in progress.
+    """
+    from .textutil import current_fiscal_year
+    today = today or timezone.localdate()
+    fy = (status.fiscal_year if status and status.fiscal_year else None) or current_fiscal_year(today)
+    fee = (pccf.fee_percent if pccf else ZERO) / 100
+    rows = []
+    for label, start, end in fiscal_quarters(fy):
+        invoiced = money_sum(Invoice.objects.filter(po__project=project, date__gte=start, date__lte=end))
+        forecast = getattr(status, label.lower()) if status else ZERO
+        state = "done" if end < today else ("now" if start <= today else "later")
+        rows.append({"label": label, "start": start, "end": end, "state": state, "forecast": forecast,
+                     "invoiced": invoiced, "actual": (invoiced * (1 + fee)).quantize(Decimal("0.01")),
+                     "difference": None})
+        if state == "done":
+            rows[-1]["difference"] = rows[-1]["actual"] - forecast
+    done = [r for r in rows if r["state"] == "done"]
+    fc_so_far = sum((r["forecast"] for r in done), ZERO)
+    act_so_far = sum((r["actual"] for r in done), ZERO)
+    under = bool(done) and fc_so_far > 0 and (fc_so_far - act_so_far) > fc_so_far * UNDERSPEND_SHARE
+    return {"fiscal_year": fy, "quarters": rows, "fee_percent": fee * 100,
+            "forecast_so_far": fc_so_far, "actual_so_far": act_so_far, "gap_so_far": act_so_far - fc_so_far,
+            "actual_year": sum((r["actual"] for r in rows), ZERO), "underspent": under}
+
+
+def money_sum(invoices):
+    return invoices.aggregate(t=Sum("amount"))["t"] or ZERO
+
+
 def current_year_funding(pccf, status):
     """This fiscal year's funding, stored with each value-of-work entry: the approved amount for the forecast's
     year when the PCCF gives one, otherwise the forecast itself."""

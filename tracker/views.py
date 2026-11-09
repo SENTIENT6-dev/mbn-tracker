@@ -15,7 +15,7 @@ from .textutil import current_fiscal_year, fiscal_label
 from .models import (PCCF, ChangeOrder, DataIssue, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
                      PurchaseOrder, StageGate, StatusHistory, ValueOfWork)
 from .operations import save_change_order
-from .services import (approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
+from .services import (spend_by_quarter, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
                        resolve_schedule_issue, schedule_health)
 
 ZERO = Decimal("0")
@@ -239,18 +239,21 @@ def project_detail(request, pk):
     # Cash flow: approved (PCCF) vs current forecast per quarter
     # (approved lined up with the forecast's fiscal year: a PCCF from last year has no quarters for this one)
     ap = approved_for_year(fin.pccf, status.fiscal_year)
-    quarters = []
-    for label, field in (("Q1", "q1"), ("Q2", "q2"), ("Q3", "q3"), ("Q4", "q4")):
-        quarters.append({"label": label, "approved": ap[field] if ap else None, "forecast": getattr(status, field)})
-    top = max([q["approved"] or ZERO for q in quarters] + [q["forecast"] for q in quarters] + [Decimal("1")])
+    spend = spend_by_quarter(project, status, fin.pccf, today)       # actual = invoices in each quarter + fee
+    quarters = spend["quarters"]
+    for q in quarters:
+        q["approved"] = ap[q["label"].lower()] if ap else None
+    top = max([q["approved"] or ZERO for q in quarters] + [q["forecast"] for q in quarters]
+              + [q["actual"] for q in quarters] + [Decimal("1")])
     for q in quarters:
         q["a_pct"] = float((q["approved"] or ZERO) / top * 100)
         q["f_pct"] = float(q["forecast"] / top * 100)
+        q["x_pct"] = float(max(q["actual"], ZERO) / top * 100)
 
     ctx = {
         "project": project, "status": status, "fin": fin, "pos": pos, "tab": tab,
         "stepper": stepper, "timeline": timeline, "years": years, "today_pos": at(today),
-        "quarters": quarters, "cash_top": top, "flagged": flagged_keys(fin), "ap": ap,
+        "quarters": quarters, "cash_top": top, "flagged": flagged_keys(fin), "ap": ap, "spend": spend,
         "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year)
         if fin.pccf and not forecast_is_stale(status) else None,
         "pccfs": pccfs, "has_charter": any(p.submission == 0 for p in pccfs),

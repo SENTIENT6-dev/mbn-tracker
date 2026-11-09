@@ -28,8 +28,11 @@
 /* cash flow columns */
 .cols{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;height:180px;align-items:end;padding:0 6px;border-bottom:1px solid var(--axis)}
 .cols .q{display:flex;gap:2px;align-items:end;height:100%;justify-content:center}
-.cols .b{width:30%;max-width:34px;border-radius:4px 4px 0 0;min-height:2px}
-.cols .b.a{background:var(--s1)} .cols .b.f{background:var(--s2)}
+.cols .b{width:26%;max-width:30px;border-radius:4px 4px 0 0;min-height:2px}
+.cols .b.a{background:var(--s1)} .cols .b.f{background:var(--s2)} .cols .b.x{background:var(--s3)}
+.cols .q.later .b.x{display:none}
+.spend-flag{padding:9px 12px;border-radius:8px;margin-bottom:12px;background:var(--crit-soft);color:var(--crit-ink);font-size:13px}
+.spend-flag strong{display:block}
 .qlabels{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;padding:6px 6px 0;text-align:center;font-size:12px;color:var(--ink-2)}
 </style>
 {% endblock %}
@@ -135,18 +138,38 @@ Actual: {{ t.e.actual }}">✓</span>{% endif %}
 <div class="grid g2">
   <div class="panel">
     <div class="panel-head"><h2>Cash flow{% if status.fiscal_year %} · FY {{ status.fiscal_year_label }}{% endif %}</h2><span class="spacer"></span>
-      <div class="legend"><span><i style="background:var(--s1)"></i>Approved (PCCF)</span><span><i style="background:var(--s2)"></i>Current forecast</span></div></div>
+      <div class="legend"><span><i style="background:var(--s1)"></i>Approved (PCCF)</span><span><i style="background:var(--s2)"></i>Forecast</span><span><i style="background:var(--s3)"></i>Actual</span></div></div>
+    {% if spend.underspent %}
+    <div class="spend-flag" role="status"><strong>▼ Under-spent so far this year</strong>
+      Actual {{ spend.actual_so_far|money }} vs forecast {{ spend.forecast_so_far|money }} for the quarters that have ended
+      ({{ spend.gap_so_far|money }}). Update the forecast for the remaining quarters, or this year's funding may lapse.</div>
+    {% endif %}
     <div class="cols">
       {% for q in quarters %}
-        <div class="q" data-tip="{{ q.label }}
+        <div class="q {{ q.state }}" data-tip="{{ q.label }} · {{ q.start|date:'M j' }} – {{ q.end|date:'M j, Y' }}{% if q.state == 'now' %} (in progress){% endif %}
 Approved: {% if q.approved != None %}{{ q.approved|money }}{% else %}not split by quarter in PCCF {{ fin.pccf.submission }}{% endif %}
-Forecast: {{ q.forecast|money }}">
+Forecast: {{ q.forecast|money }}
+Actual: {% if q.state == 'later' %}not started{% else %}{{ q.actual|money }} (invoices {{ q.invoiced|money }} + fee){% endif %}">
           <div class="b a" style="height:{{ q.a_pct|floatformat:"2u" }}%"></div>
           <div class="b f" style="height:{{ q.f_pct|floatformat:"2u" }}%"></div>
+          <div class="b x" style="height:{{ q.x_pct|floatformat:"2u" }}%"></div>
         </div>
       {% endfor %}
     </div>
-    <div class="qlabels">{% for q in quarters %}<div>{{ q.label }}<div class="muted">{{ q.forecast|money }}</div></div>{% endfor %}</div>
+    <div class="qlabels">{% for q in quarters %}<div>{{ q.label }}{% if q.state == 'now' %} <span class="muted">· now</span>{% endif %}</div>{% endfor %}</div>
+    <table class="compact spend" style="margin-top:12px">
+      <thead><tr><th></th>{% for q in quarters %}<th class="n">{{ q.label }}</th>{% endfor %}<th class="n">Year</th></tr></thead>
+      <tbody>
+        <tr><td class="ink2">Forecast</td>{% for q in quarters %}<td class="n">{{ q.forecast|money }}</td>{% endfor %}<td class="n">{{ status.current_year_forecast|money }}</td></tr>
+        <tr><td class="ink2" title="Invoices dated in the quarter, plus the {{ spend.fee_percent|floatformat:2 }}% fee, to compare with the cash flow (which includes the fee)">Actual</td>
+          {% for q in quarters %}<td class="n">{% if q.state == 'later' %}<span class="muted">–</span>{% else %}{{ q.actual|money }}{% endif %}</td>{% endfor %}
+          <td class="n">{{ spend.actual_year|money }}</td></tr>
+        <tr><td class="ink2">Difference</td>
+          {% for q in quarters %}<td class="n {% if q.difference|neg %}neg{% endif %}">{% if q.difference != None %}{% if not q.difference|neg %}+{% endif %}{{ q.difference|money }}{% elif q.state == 'now' %}<span class="muted">in progress</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endfor %}
+          <td class="n {% if spend.gap_so_far|neg %}neg{% endif %}" title="Quarters that have ended">{% if spend.forecast_so_far or spend.actual_so_far %}{% if not spend.gap_so_far|neg %}+{% endif %}{{ spend.gap_so_far|money }}{% else %}<span class="muted">–</span>{% endif %}</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:11.5px;margin:6px 0 0">Actual = invoices dated in each quarter plus the {{ spend.fee_percent|floatformat:2 }}% fee, so it compares with the cash flow. The year difference counts quarters that have ended.</p>
     <table style="margin-top:14px">
       <thead><tr><th></th><th class="n">Previous yrs</th><th class="n">This year</th><th class="n">Next year</th><th class="n">Future</th></tr></thead>
       <tbody>

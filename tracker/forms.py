@@ -6,11 +6,23 @@ from django import forms
 from django.db.models import Case, When
 from django.utils.html import format_html
 
+from .models import (
+    PCCF,
+    Building,
+    BuildingRole,
+    ChangeOrder,
+    Company,
+    Invoice,
+    Person,
+    Project,
+    ProjectStatus,
+    Property,
+    PurchaseOrder,
+    ValueOfWork,
+    po_label,
+)
 from .services import invoice_room, room_message, schedule_problems
 from .textutil import current_fiscal_year, fiscal_label
-
-from .models import (PCCF, Building, BuildingRole, ChangeOrder, Company, Invoice, Person, Project, ProjectStatus,
-                     Property, PurchaseOrder, ValueOfWork, po_label)
 
 DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
@@ -122,7 +134,8 @@ class ProjectForm(DateFieldsMixin, forms.ModelForm):
         fields = ["io_number", "bgis_number", "title", "status", "kind", "phase"]
         widgets = {"io_number": forms.TextInput(attrs={"placeholder": "e.g. 1100123"}),
                    "bgis_number": forms.TextInput(attrs={"placeholder": "e.g. IO_1841870 (optional)"}),
-                   "title": forms.TextInput(attrs={"placeholder": "Short description of the work, e.g. Roof replacement"})}
+                   "title": forms.TextInput(attrs={
+                       "placeholder": "Short description of the work, e.g. Roof replacement"})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -217,7 +230,7 @@ class ScheduleOrderMixin:
     def clean(self):
         data = super().clean()
         probs = schedule_problems(lambda f: data.get(f))
-        for pf, pl, pd, lf, ll, ld in probs:
+        for _pf, pl, pd, lf, _ll, _ld in probs:
             if lf in self.fields and lf not in self.errors:
                 self.add_error(lf, f"Can't be before {pl} ({pd:%Y-%m-%d}).")
         if probs:
@@ -226,6 +239,13 @@ class ScheduleOrderMixin:
                 "; ".join(f"{ll} ({ld:%Y-%m-%d}) is before {pl} ({pd:%Y-%m-%d})" for pf, pl, pd, lf, ll, ld in probs)
                 + ". Each milestone must be on or after the one before it.")
         return data
+
+
+# Every PCCF field a person fills in (project and submission number are set by the tracker), in model order
+PCCF_FIELDS = ["date", "final", "notes", "approval_date", "design_start", "design_end", "construction_award",
+               "substantial", "closeout", "design_cost", "construction_cost", "design_contingency",
+               "construction_contingency", "fee_percent", "fee", "fiscal_year", "previous", "q1", "q2", "q3", "q4",
+               "next_year", "future"]
 
 
 class PCCFLayoutMixin:
@@ -245,7 +265,7 @@ class PCCFForm(PCCFLayoutMixin, ScheduleOrderMixin, CashFlowMatchesBudgetMixin, 
 
     class Meta:
         model = PCCF
-        exclude = ["project", "submission"]
+        fields = PCCF_FIELDS
         widgets = {"notes": forms.Textarea(attrs={"rows": 5})}
         help_texts = {"notes": "Scope, methodology, milestone and budget changes"}
 
@@ -261,7 +281,7 @@ class CharterForm(PCCFLayoutMixin, ScheduleOrderMixin, CashFlowMatchesBudgetMixi
 
     class Meta:
         model = PCCF
-        exclude = ["project", "submission", "final"]
+        fields = [f for f in PCCF_FIELDS if f != "final"]
         widgets = {"notes": forms.Textarea(attrs={"rows": 4})}
         labels = {"notes": "Charter notes", "date": "Charter date"}
         help_texts = {"notes": "Scope and anything else worth recording about the charter"}
@@ -615,9 +635,9 @@ class VOWForm(DateFieldsMixin, forms.Form):
 
     def to_entry(self, project, fee_percent, current_year_funding):
         prev = (self.cleaned_data["previous_years_with_fees"] / (1 + fee_percent / 100)).quantize(Decimal("0.01"))
-        return dict(project=project, reporting_date=self.cleaned_data["reporting_date"],
-                    previous_years_no_fees=prev, total_no_fees=prev + self.cleaned_data["current_year_no_fees"],
-                    current_year_funding=current_year_funding)
+        return {"project": project, "reporting_date": self.cleaned_data["reporting_date"],
+                    "previous_years_no_fees": prev, "total_no_fees": prev + self.cleaned_data["current_year_no_fees"],
+                    "current_year_funding": current_year_funding}
 
 
 class IssueForm(forms.Form):

@@ -19,18 +19,40 @@ try:
 except ImportError:          # hosted (Linux) copies have no Access driver
     pyodbc = None
 from django.conf import settings
-from tracker.textutil import combine_notes
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from tracker.models import (PCCF, Building, BuildingRole, ChangeOrder, Company, CompanyType,
-                            HeritageStatus, Invoice, Owner, Person, Project, ProjectStatus, Property, PurchaseOrder,
-                            RoleType, StageGate, StatusHistory, ValueOfWork, po_label)
+from tracker.models import (
+    PCCF,
+    Building,
+    BuildingRole,
+    ChangeOrder,
+    Company,
+    CompanyType,
+    HeritageStatus,
+    Invoice,
+    Owner,
+    Person,
+    Project,
+    ProjectStatus,
+    Property,
+    PurchaseOrder,
+    RoleType,
+    StageGate,
+    StatusHistory,
+    ValueOfWork,
+    po_label,
+)
+from tracker.textutil import combine_notes
 
-from ._import_fixes import HIGH as H, LOW as L, MEDIUM as M, ImportIssue, resolve
+from ._import_fixes import HIGH as H
+from ._import_fixes import LOW as L
+from ._import_fixes import MEDIUM as M
+from ._import_fixes import ImportIssue, resolve
 
 ZERO = Decimal("0")
+BUDGET_KEYS = ("DesignCost", "ConstrCost", "DesignCont", "ConstrCont", "Fee")
 
 
 def s(v):
@@ -89,9 +111,9 @@ class Command(BaseCommand):
 
         # This tracker belongs to one PM: remember who, so a reload keeps them and (by default) only their projects
         owner = Owner.current()
-        self.keep_owner = None if owner is None else dict(
-            first_name=owner.person.first_name, last_name=owner.person.last_name, email=owner.person.email,
-            phone=owner.person.phone, position=owner.person.position)
+        self.keep_owner = None if owner is None else {
+            "first_name": owner.person.first_name, "last_name": owner.person.last_name, "email": owner.person.email,
+            "phone": owner.person.phone, "position": owner.person.position}
         if not all_pms and not pm and owner:
             pm = f"{owner.person.first_name} {owner.person.last_name}"
         self.pm_key = None if (all_pms or not pm) else " ".join(pm.split()).lower()
@@ -122,7 +144,8 @@ class Command(BaseCommand):
             shutil.rmtree(tmp.parent, ignore_errors=True)
 
         counts = {m.__name__: m.objects.count() for m in
-                  (Company, Person, Property, Building, BuildingRole, Project, PCCF, PurchaseOrder, Invoice, ChangeOrder,
+                  (Company, Person, Property, Building, BuildingRole, Project, PCCF, PurchaseOrder, Invoice,
+                   ChangeOrder,
                    ProjectStatus, StatusHistory, ValueOfWork)}
         for k, v in counts.items():
             self.stdout.write(f"  {k:<15} {v}")
@@ -234,7 +257,8 @@ class Command(BaseCommand):
         BuildingRole.objects.bulk_create(roles, batch_size=2000)
         if missing:
             self.issue("Role for missing person", L,
-                       f"{missing:,} building-contact links pointed at people or buildings that no longer exist; skipped.")
+                       f"{missing:,} building-contact links pointed at people or buildings that no longer exist; "
+                       f"skipped.")
 
     def projects(self):
         self.project = {}
@@ -344,7 +368,7 @@ class Command(BaseCommand):
                 self.issue("Duplicate PCCF submission", sev,
                            f"{project.io_number} had two PCCF {sub} entries; {what}. Kept the later one "
                            f"(total ${obj.total_budget:,}); the dropped one totalled "
-                           f"${sum(n(extra[k]) for k in ('DesignCost', 'ConstrCost', 'DesignCont', 'ConstrCont', 'Fee')):,}.",
+                           f"${sum(n(extra[k]) for k in BUDGET_KEYS):,}.",
                            {"kept_access_id": keep["ID"], "dropped": jsonable(extra)}, project)
 
     def purchase_orders(self):
@@ -375,8 +399,8 @@ class Command(BaseCommand):
             key = (po, num, amt, date)
             if key in seen:
                 self.issue("Duplicate invoice", H,
-                           f"Invoice {num} on PO {po_label(po)} for ${amt:,} dated {date} was entered twice in Access and "
-                           f"counted twice. Imported once.", jsonable(r))
+                           f"Invoice {num} on PO {po_label(po)} for ${amt:,} dated {date} was entered twice in "
+                           f"Access and counted twice. Imported once.", jsonable(r))
                 continue
             seen.add(key)
             inv = Invoice.objects.create(po=self.po[po], number=num, amount=amt, date=date)
@@ -401,7 +425,8 @@ class Command(BaseCommand):
                 state = ChangeOrder.State.APPROVED
             else:
                 state = ChangeOrder.State.REQUESTED
-            co = ChangeOrder.objects.create(po=self.po[r["PO"]], description=s(r["Description"])[:255] or "(no description)",
+            co = ChangeOrder.objects.create(po=self.po[r["PO"]],
+                                            description=s(r["Description"])[:255] or "(no description)",
                                             value=n(r["Change_Value"]), status=state,
                                             folder_link=s(r["LinkToFolder"]), comment=s(r["Comment"]))
             if self.project.get(r["Project"]) != co.po.project:
@@ -475,7 +500,8 @@ class Command(BaseCommand):
             inv = po.invoiced()
             if inv > po.amount + po.pending_changes() + Decimal("0.01"):
                 self.issue("PO over-invoiced", M,
-                           f"PO {po.number} is invoiced ${inv:,} against a value of ${po.amount:,}.", project=po.project)
+                           f"PO {po.number} is invoiced ${inv:,} against a value of ${po.amount:,}.",
+                           project=po.project)
         for p in Project.objects.filter(status=Project.Status.ACTIVE):
             if not p.vow_entries.exists():
                 self.issue("No value of work", L, f"Active project {p.io_number} has no VOW entries.", project=p)

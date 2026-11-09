@@ -83,7 +83,8 @@ def settings_page(request):
             if path:
                 messages.success(request, f"Backup saved: {path.name}")
             else:
-                messages.error(request, "This copy of the tracker doesn't use a database file, so there's nothing to back up.")
+                messages.error(request, "This copy of the tracker doesn't use a database file, so there's "
+                                        "nothing to back up.")
             return redirect("settings")
         if "save_profile" in request.POST and profile.is_valid():
             set_owner(**profile.cleaned_data)

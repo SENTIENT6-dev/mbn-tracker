@@ -4,8 +4,21 @@ from decimal import Decimal as D
 from django.db import IntegrityError, transaction
 from django.test import TestCase, TransactionTestCase
 
-from .models import (PCCF, Building, ChangeOrder, Company, CompanyType, Invoice, Person, Project, ProjectStatus,
-                     Property, PurchaseOrder, StatusHistory, ValueOfWork)
+from .models import (
+    PCCF,
+    Building,
+    ChangeOrder,
+    Company,
+    CompanyType,
+    Invoice,
+    Person,
+    Project,
+    ProjectStatus,
+    Property,
+    PurchaseOrder,
+    StatusHistory,
+    ValueOfWork,
+)
 from .services import milestones, project_financials
 
 
@@ -153,7 +166,9 @@ class ChangeOrderTests(Base):
         self.assertEqual(self.po1.amount, D("105000"))
 
 
-class MPSRTests(Base):
+class StatusUpdateTests(Base):
+    """The status update endpoints (was a second "MPSRTests", which hid these tests until linting caught it)."""
+
     def test_cash_flow_update_logs_history(self):
         self.client.post(f"/projects/{self.p.pk}/update/cash/", {
             "cash-fiscal_year": "2025", "cash-previous": "0", "cash-q1": "5", "cash-q2": "6", "cash-q3": "7",
@@ -471,7 +486,7 @@ class OwnerTests(TestCase):
     def test_projects_belong_to_the_owner(self):
         from .operations import set_owner
         set_owner("Jo", "Smith")
-        b = Building.objects.create(asset_number="B1")
+        Building.objects.create(asset_number="B1")
         self.client.post("/projects/new/", {"p-io_number": "5", "p-title": "T", "p-status": "1", "p-kind": "1",
                                             "p-building_asset": "B1", "c-design_cost": "1", "c-future": "1"})
         p = Project.objects.get(io_number="5")
@@ -496,7 +511,7 @@ class OwnerTests(TestCase):
         self.assertEqual(p1.project_manager, p2.project_manager)
         owner = set_owner("Sam", "Rivera")
         self.assertEqual(owner.person, kept)                     # no new duplicate created
-        r = self.client.post(f"/people/new/", {"first_name": "SAM", "last_name": "Rivera",
+        r = self.client.post("/people/new/", {"first_name": "SAM", "last_name": "Rivera",
                                                "company": bgis.pk})
         self.assertContains(r, "is already listed at BGIS")
 
@@ -527,7 +542,7 @@ class MPSRTests(Base):
         """Everything the MPSR page shows, as it would be sent back, with some changes."""
         data = {}
         for prefix, form in r.context["f"].items():
-            for name, field in form.fields.items():
+            for name in form.fields:
                 key = f"{prefix}-{name}"
                 val = form[name].value()
                 if isinstance(val, bool):
@@ -800,9 +815,11 @@ class HostingTests(TestCase):
             self.assertRedirects(self.client.get("/"), "/setup/", fetch_redirect_response=False)
 
     def test_seed_demo_loads_consistent_data(self):
-        from django.core.management import call_command
-        from .models import Owner
         from io import StringIO
+
+        from django.core.management import call_command
+
+        from .models import Owner
         call_command("seed_demo", stdout=StringIO())
         self.assertEqual(Project.objects.count(), 10)
         self.assertEqual(str(Owner.current()), "Alex Morgan")
@@ -839,7 +856,7 @@ class TenderMilestoneTests(Base):
         st.actual_design_end = dt.date(2026, 4, 1)                  # design end corrected later
         st.save()
         self.assertEqual(self._tender().forecast, dt.date(2026, 5, 1))
-        r = self.client.post(f"/projects/{self.p.pk}/update/act/", {
+        self.client.post(f"/projects/{self.p.pk}/update/act/", {
             "act-actual_design_end": "2026-04-20", "act-stage": ""})
         self.assertEqual(self._tender().forecast, dt.date(2026, 5, 20))
 
@@ -1209,7 +1226,9 @@ class DataIssuesRemovedTests(Base):
 class MonthlyReportTests(Base):
     def test_report_page_and_excel(self):
         from io import BytesIO
+
         from openpyxl import load_workbook
+
         from .models import MPSRReview, StageGate
         design = StageGate.objects.create(name="99% Design", order=4)
         tender = StageGate.objects.create(name="Tender", order=5)
@@ -1274,6 +1293,7 @@ class BackupTests(TransactionTestCase):
 
     def test_daily_backup_once_a_day_and_readable(self):
         import sqlite3
+
         from .backup import ensure_daily_backup
         path = ensure_daily_backup(dt.date(2026, 11, 9))
         self.assertIsNotNone(path)
@@ -1289,6 +1309,7 @@ class BackupTests(TransactionTestCase):
         import os
         import time
         from pathlib import Path
+
         from .backup import prune
         old = time.mktime(dt.datetime(2026, 9, 1).timetuple())
         for name in ("db-daily-20260901-080000.sqlite3", "db-manual-20260901-080000.sqlite3",
@@ -1309,6 +1330,7 @@ class BackupTests(TransactionTestCase):
 
     def test_failed_backup_never_breaks_a_page(self):
         from unittest import mock
+
         from .backup import DailyBackupMiddleware
         mw = DailyBackupMiddleware(lambda request: "page")
         with mock.patch("tracker.backup.ensure_daily_backup", side_effect=OSError("disk full")), \

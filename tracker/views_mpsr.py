@@ -14,9 +14,20 @@ from django.utils import timezone
 from . import forms as F
 from . import snapshot
 from .models import MPSRReview, MPSRSnapshot, Project, ProjectStatus, StatusHistory, ValueOfWork
+from .services import (
+    PCCF_DATES,
+    TENDER_DAYS,
+    approved_cash_for_year,
+    approved_for_year,
+    current_year_funding,
+    financials,
+    flagged_keys,
+    forecast_is_stale,
+    milestones,
+    pccf_flag_message,
+    project_financials,
+)
 from .textutil import current_fiscal_year, fiscal_label
-from .services import (PCCF_DATES, TENDER_DAYS, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, milestones,
-                       pccf_flag_message, project_financials)
 
 ZERO = Decimal("0")
 REPORTING = [Project.Status.ACTIVE, Project.Status.ON_HOLD]
@@ -69,7 +80,8 @@ def mpsr_list(request):
 
 def _forms(status, fin, data=None):
     vow_initial = {"reporting_date": timezone.localdate(),
-                   "previous_years_with_fees": (fin.vow_previous * (1 + fin.fee_percent / 100)).quantize(Decimal("0.01")),
+                   "previous_years_with_fees":
+                       (fin.vow_previous * (1 + fin.fee_percent / 100)).quantize(Decimal("0.01")),
                    "current_year_no_fees": fin.vow_current_year}
     return {
         "comment": F.MPSRTextForm(data, prefix="comment", initial={"text": status.comments}),

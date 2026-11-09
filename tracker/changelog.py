@@ -4,7 +4,7 @@ Every save or delete of one of these is recorded (old and new values) by Django 
 which screen made the change. Bulk loads (the Access import, demo data) switch it off with `quiet()`.
 """
 import threading
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from decimal import Decimal
 
 from django.db.models.signals import post_delete, post_save, pre_save
@@ -96,10 +96,9 @@ def after_save(sender, instance, created, **kwargs):
 def after_delete(sender, instance, **kwargs):
     if getattr(_state, "quiet", False):
         return
-    try:
+    # if its PO was deleted in the same step, the PO's own entry records it
+    with suppress(PurchaseOrder.DoesNotExist, AttributeError):
         _log(instance, ChangeLog.Action.DELETED, {k: [v, ""] for k, v in _values(instance).items() if v})
-    except (PurchaseOrder.DoesNotExist, AttributeError):
-        pass   # its PO was deleted in the same step; the PO's own entry records it
 
 
 def connect():

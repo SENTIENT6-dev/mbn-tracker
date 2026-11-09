@@ -6,18 +6,41 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import (Case, Count, DecimalField, IntegerField, OuterRef, ProtectedError, Q, Subquery, Sum,
-                              Value, When)
-from django.http import JsonResponse
+from django.db.models import (
+    Case,
+    Count,
+    DecimalField,
+    IntegerField,
+    OuterRef,
+    ProtectedError,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+    When,
+)
 from django.db.models.functions import Coalesce, ExtractYear, TruncMonth
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import forms as F
 from . import operations as ops
-from .models import (PCCF, Building, BuildingRole, ChangeOrder, Company, CompanyType, HeritageStatus, Invoice,
-                     Person, Project, Property, PurchaseOrder, RoleType, StageGate, ValueOfWork)
+from .models import (
+    PCCF,
+    Building,
+    BuildingRole,
+    ChangeOrder,
+    Company,
+    CompanyType,
+    Invoice,
+    Person,
+    Project,
+    Property,
+    PurchaseOrder,
+    ValueOfWork,
+)
 from .services import financials, invoice_room, po_rows
 from .textutil import fiscal_label
 

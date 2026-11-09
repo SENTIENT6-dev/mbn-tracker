@@ -1,15 +1,15 @@
 """Financial figures, computed in one place (replaces the chained Access queries:
 Commitments, ApprovedSpend, BudgetWithoutFee, SumOfPendingCO, CurrentVOW,
 Project_Financials, MPSR, Contingencies, KahuaVoW, MPSR_Form_Query)."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from datetime import timedelta
 from decimal import Decimal
 
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import (PCCF, ChangeOrder, Invoice, KPIFailure, Project, ProjectStatus, PurchaseOrder,
-                     ValueOfWork)
+from .models import PCCF, ChangeOrder, Invoice, KPIFailure, Project, ProjectStatus, PurchaseOrder, ValueOfWork
 
 ZERO = Decimal("0")
 CONSULTANT, CONTRACTOR = "Consultant", "Contractor"
@@ -290,7 +290,7 @@ class Financials:
     contractor_commitments: Decimal = ZERO
     pending: Decimal = ZERO
     invoiced: Decimal = ZERO
-    kpi_failures: list = field(default_factory=list)
+    kpi_failures: list = dc_field(default_factory=list)
     closing: bool = False   # closing out: stage Closeout or later, phase Financial Close, or completed / closed
     in_construction: bool = False   # stage Construction or later, or phase Construction / Financial Close
 

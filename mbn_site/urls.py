@@ -1,12 +1,12 @@
 from django.contrib import admin
 from django.urls import path
 
+from tracker import setup as site
 from tracker import views as v
 from tracker import views_manage as m
 from tracker import views_mpsr as mp
-from tracker import views_report as rp
-from tracker import setup as site
 from tracker import views_owner as o
+from tracker import views_report as rp
 
 urlpatterns = [
     path("", v.overview, name="overview"),

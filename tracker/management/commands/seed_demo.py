@@ -11,9 +11,28 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from tracker.models import (PCCF, Building, BuildingRole, ChangeLog, ChangeOrder, Company, CompanyType,
-                            HeritageStatus, Invoice, MPSRReview, Owner, Person, Project, ProjectStatus, Property,
-                            PurchaseOrder, RoleType, StageGate, StatusHistory, ValueOfWork)
+from tracker.models import (
+    PCCF,
+    Building,
+    BuildingRole,
+    ChangeLog,
+    ChangeOrder,
+    Company,
+    CompanyType,
+    HeritageStatus,
+    Invoice,
+    MPSRReview,
+    Owner,
+    Person,
+    Project,
+    ProjectStatus,
+    Property,
+    PurchaseOrder,
+    RoleType,
+    StageGate,
+    StatusHistory,
+    ValueOfWork,
+)
 from tracker.operations import set_owner
 from tracker.textutil import current_fiscal_year
 
@@ -95,7 +114,8 @@ class Command(BaseCommand):
 
         owner = set_owner("Alex", "Morgan", email="alex.morgan@example.com", phone="(555) 010-0100")
         Company.objects.filter(name=Project.PM_COMPANY).update(company_type=types["Project Manager"])
-        Company.objects.get_or_create(name=Project.CLIENT_NAME, defaults={"acronym": "IO", "company_type": types["Client"]})
+        Company.objects.get_or_create(name=Project.CLIENT_NAME,
+                                      defaults={"acronym": "IO", "company_type": types["Client"]})
 
         vendors = []
         for i, (name, kind, acr, city) in enumerate(VENDORS):
@@ -128,19 +148,19 @@ class Command(BaseCommand):
                                        else Project.Kind.MINISTRY, project_manager=owner.person)
             # charter: design 12%, construction 70%, contingencies 4% + 14%, fee 8%
             base = Decimal(budget)
-            parts = dict(design_cost=m(base * Decimal(".12")), construction_cost=m(base * Decimal(".70")),
-                         design_contingency=m(base * Decimal(".04")))
+            parts = {"design_cost": m(base * Decimal(".12")), "construction_cost": m(base * Decimal(".70")),
+                         "design_contingency": m(base * Decimal(".04"))}
             parts["construction_contingency"] = base - sum(parts.values())
-            dates = dict(approval_date=start, design_start=add_months(start, 1), design_end=add_months(start, 8),
-                         construction_award=add_months(start, 11), substantial=add_months(start, 24),
-                         closeout=add_months(start, 30))
+            dates = {"approval_date": start, "design_start": add_months(start, 1), "design_end": add_months(start, 8),
+                         "construction_award": add_months(start, 11), "substantial": add_months(start, 24),
+                         "closeout": add_months(start, 30)}
             total = m(base * Decimal("1.08"))
             spent_before = m(total * Decimal(str(min(progress, .9))) * Decimal(".6"))
             rest = total - spent_before
             q = [m(rest * Decimal(f)) for f in (".1", ".12", ".12", ".11")]
             nxt = m(rest * Decimal(".35"))
-            cash = dict(previous=spent_before, q1=q[0], q2=q[1], q3=q[2], q4=q[3], next_year=nxt,
-                        future=rest - sum(q) - nxt)
+            cash = {"previous": spent_before, "q1": q[0], "q2": q[1], "q3": q[2], "q4": q[3], "next_year": nxt,
+                        "future": rest - sum(q) - nxt}
             PCCF.objects.create(project=p, submission=0, date=start, fiscal_year=fy, fee_percent=Decimal("8"),
                                 fee=total - base, final=False, notes="Charter: scope as per building condition "
                                 "assessment. Fictional demo data.", **parts, **dates, **cash)

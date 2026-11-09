@@ -1,0 +1,20 @@
+# Linting with Ruff:  .venv\Scripts\ruff check .        (add --fix to fix what it can)
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+extend-exclude = ["tracker/migrations", "staticfiles", "backups"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes (unused imports, undefined names...), I import order,
+# B bugbear (likely bugs), UP pyupgrade, DJ Django checks, C4 comprehensions, SIM simplifications
+select = ["E", "W", "F", "I", "B", "UP", "DJ", "C4", "SIM"]
+ignore = [
+    "DJ001",   # null=True on CharField: the Access import relies on it in a few places
+    "SIM108",  # ternary instead of if/else: not always clearer
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tracker/tests.py" = ["E501"]          # long assertion lines are easier to read whole
+
+[tool.ruff.lint.isort]
+known-first-party = ["tracker", "mbn_site"]

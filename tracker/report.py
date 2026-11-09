@@ -225,7 +225,8 @@ def report_workbook(report):
                 cell.number_format = money
         for row in ws.iter_rows(min_row=2):
             for cell in row:
-                cell.alignment = Alignment(vertical="top", wrap_text=isinstance(cell.value, str) and len(cell.value) > 40)
+                long_text = isinstance(cell.value, str) and len(cell.value) > 40
+                cell.alignment = Alignment(vertical="top", wrap_text=long_text)
         ws.freeze_panes = "A2"
 
     # Summary
@@ -280,7 +281,8 @@ def report_workbook(report):
         actions.append([r.project.io_number, r.project.title, "Over budget",
                         f"Committed + pending exceed the budget by ${-r.fin.remaining_budget:,.2f}"])
     for r in report.underspent_rows:
-        actions.append([r.project.io_number, r.project.title, "Under-spent", "Spend so far this year trails the forecast"])
+        actions.append([r.project.io_number, r.project.title, "Under-spent",
+                        "Spend so far this year trails the forecast"])
     for k in report.kpi_failures_this_month:
         actions.append([k.project.io_number, k.project.title, "KPI failure recorded",
                         f"{k.get_milestone_display()} target {k.target}: {k.note}"])

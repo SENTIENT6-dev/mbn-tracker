@@ -7,12 +7,12 @@ VOW reporting dates) are enforced by the database.
 from decimal import Decimal
 
 from django.db import models
-from django.db.models import Q, Sum
+from django.db.models import Sum
 
 from .textutil import fiscal_label
 
 ZERO = Decimal("0")
-MONEY = dict(max_digits=14, decimal_places=2, default=ZERO)
+MONEY = {"max_digits": 14, "decimal_places": 2, "default": ZERO}
 
 
 def money(value):
@@ -134,6 +134,9 @@ class BuildingRole(models.Model):
         ordering = ["role__name"]
         constraints = [models.UniqueConstraint(fields=["building", "person", "role"], name="one_role_per_person")]
 
+    def __str__(self):
+        return f"{self.role} for {self.building}: {self.person}"
+
 
 class StageGate(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -196,10 +199,6 @@ class Project(models.Model):
     CLIENT_NAME = "Infrastructure Ontario"
     PM_COMPANY = "BGIS"   # project managers are always BGIS staff
 
-    @classmethod
-    def pm_company(cls):
-        return Company.objects.get_or_create(name=cls.PM_COMPANY)[0]
-
     def save(self, *args, **kwargs):
         # The client is always Infrastructure Ontario
         if self.client_id is None:
@@ -210,6 +209,10 @@ class Project(models.Model):
             if owner:
                 self.project_manager = owner.person
         super().save(*args, **kwargs)
+
+    @classmethod
+    def pm_company(cls):
+        return Company.objects.get_or_create(name=cls.PM_COMPANY)[0]
 
     # ---- figures used by financial screens (one place, instead of 10 chained queries)
     def latest_pccf(self):
@@ -294,7 +297,8 @@ class PCCF(models.Model):
 # ---------------------------------------------------------------- procurement
 
 def po_label(number):
-    """PO numbers as shown in the tracker: Access's 999-prefixed POs are written with ION instead (99900123 -> ION00123)."""
+    """PO numbers as shown in the tracker: Access's 999-prefixed POs are written with ION instead
+    (99900123 -> ION00123)."""
     s = str(number).strip().upper()
     return "ION" + s[3:] if s.startswith("999") and len(s) > 3 else s
 
@@ -461,6 +465,9 @@ class StatusHistory(models.Model):
         ordering = ["-changed_at"]
         verbose_name_plural = "status history"
 
+    def __str__(self):
+        return f"{self.project.io_number} {self.get_kind_display()} {self.changed_at:%Y-%m-%d}"
+
 
 class MPSRReview(models.Model):
     """A project's monthly MPSR has been gone through for this period (month)."""
@@ -471,6 +478,9 @@ class MPSRReview(models.Model):
     class Meta:
         ordering = ["-period"]
         constraints = [models.UniqueConstraint(fields=["project", "period"], name="one_review_per_month")]
+
+    def __str__(self):
+        return f"{self.project.io_number} MPSR done for {self.period:%B %Y}"
 
 
 class ChangeLog(models.Model):
@@ -493,6 +503,9 @@ class ChangeLog(models.Model):
     class Meta:
         ordering = ["-when", "-id"]
 
+    def __str__(self):
+        return f"{self.get_action_display()} {self.label}"
+
 
 class MPSRSnapshot(models.Model):
     """What was reported for a project in a month: the figures as they stood when that month's MPSR was saved.
@@ -505,6 +518,9 @@ class MPSRSnapshot(models.Model):
     class Meta:
         ordering = ["-period"]
         constraints = [models.UniqueConstraint(fields=["project", "period"], name="one_snapshot_per_month")]
+
+    def __str__(self):
+        return f"{self.project.io_number} reported for {self.period:%B %Y}"
 
 
 class ValueOfWork(models.Model):
@@ -519,6 +535,9 @@ class ValueOfWork(models.Model):
         constraints = [models.UniqueConstraint(fields=["project", "reporting_date"], name="one_vow_per_day")]
         verbose_name = "value of work entry"
         verbose_name_plural = "value of work"
+
+    def __str__(self):
+        return f"{self.project.io_number} VOW {self.reporting_date}"
 
     @property
     def current_year_no_fees(self):

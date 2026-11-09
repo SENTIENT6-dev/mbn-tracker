@@ -10,8 +10,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import (PCCF, BuildingRole, ChangeOrder, Invoice, Person, Project, PurchaseOrder,
-                     StatusHistory, ValueOfWork)
+from .models import BuildingRole, ChangeOrder, Invoice, Person, Project, PurchaseOrder
 
 ZERO = Decimal("0")
 
@@ -91,7 +90,8 @@ def delete_change_order(co, reverse=True):
 
 def company_impact(company):
     return [
-        ("Purchase orders (as vendor)", company.purchase_orders.count(), _money(company.purchase_orders.all(), "amount")),
+        ("Purchase orders (as vendor)", company.purchase_orders.count(),
+         _money(company.purchase_orders.all(), "amount")),
         ("Projects (as client)", company.client_projects.count(), None),
         ("Contacts", company.people.count(), None),
     ]

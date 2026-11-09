@@ -150,6 +150,15 @@ projects, duplicate entries) are fixed automatically (`_import_fixes.py`); nothi
 .venv\Scripts\python.exe manage.py test tracker
 ```
 
+## Linting
+The code is checked with [Ruff](https://docs.astral.sh/ruff/) (settings in `pyproject.toml`). Install it once with
+`.venv\Scripts\pip install -r requirements-dev.txt`, then:
+```
+.venv\Scripts\ruff check .
+```
+Add `--fix` to let it fix what it can (unused imports, import order...). Run it before pushing; it should say
+"All checks passed!".
+
 ## Backups
 The tracker saves a copy of the database automatically the first time it's used each day, into the `backups`
 folder (not sent to GitHub). Daily copies are kept for 30 days. **Settings → Back up now** makes an extra copy,

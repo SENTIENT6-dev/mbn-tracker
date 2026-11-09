@@ -11,12 +11,39 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import forms as F
-from .textutil import current_fiscal_year, fiscal_label
-from .models import (PCCF, ChangeLog, ChangeOrder, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
-                     PurchaseOrder, StageGate, StatusHistory, ValueOfWork)
+from .models import (
+    PCCF,
+    ChangeLog,
+    ChangeOrder,
+    Invoice,
+    KPIFailure,
+    MPSRReview,
+    Project,
+    ProjectStatus,
+    PurchaseOrder,
+    StageGate,
+    StatusHistory,
+    ValueOfWork,
+)
 from .operations import save_change_order
-from .services import (co_budget_error, po_room, spend_by_quarter, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
-                       schedule_health)
+from .services import (
+    approved_cash_for_year,
+    approved_for_year,
+    co_budget_error,
+    current_year_funding,
+    financials,
+    flagged_keys,
+    forecast_is_stale,
+    invoice_room,
+    milestones,
+    pccf_flag_message,
+    po_room,
+    po_rows,
+    project_financials,
+    schedule_health,
+    spend_by_quarter,
+)
+from .textutil import current_fiscal_year, fiscal_label
 
 ZERO = Decimal("0")
 STATUS_FILTERS = {
@@ -101,7 +128,8 @@ def overview(request):
         v["pct"] = float(v["t"] / vtop * 100)
 
     return render(request, "tracker/overview.html", {
-        "months": months, "last12": last12, "cash": cash, "cash_projects": len(split), "vendors": vend, "latest_invoice": latest,
+        "months": months, "last12": last12, "cash": cash, "cash_projects": len(split), "vendors": vend,
+        "latest_invoice": latest,
         "rows": sorted(rows, key=lambda f: -f.budget), "totals": totals, "stages": stages,
         "upcoming": upcoming[:12], "upcoming_count": len(upcoming), "overdue_count": len(overdue),
         "attention": attention[:8], "today": today, "pccf_count": sum(f.pccf_required for f in rows),
@@ -210,7 +238,7 @@ def project_detail(request, pk):
                 ("done" if g.order < cur else "current" if g.order == cur else "todo")} for g in gates]
 
     # Milestone timeline: position every date on one shared time axis
-    events = [e for e in milestones([project])]
+    events = list(milestones([project]))
     for e in events:
         e.css = e.state(today)
     all_dates = [d for e in events for d in (e.approved, e.forecast, e.actual) if d] + [today]

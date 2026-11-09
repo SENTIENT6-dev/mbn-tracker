@@ -414,6 +414,24 @@ def tender_deadline(status):
     return None
 
 
+CONSTRUCTION_PHASES = (Project.Phase.CONSTRUCTION, Project.Phase.FINANCIAL_CLOSE)
+
+
+def construction_check():
+    """Returns is_in_construction(project, status): the stage is Construction or a later gate, or the
+    project's phase is Construction / Financial Close. Either means the project has gone past tender."""
+    from .models import StageGate
+    gates = dict(StageGate.objects.values_list("pk", "order"))
+    start = StageGate.objects.filter(name__iexact="Construction").values_list("order", flat=True).first()
+
+    def check(project, status):
+        if project.phase in CONSTRUCTION_PHASES:
+            return True
+        stage_order = gates.get(status.stage_id) if status is not None else None
+        return start is not None and stage_order is not None and stage_order >= start
+    return check
+
+
 @dataclass
 class Milestone:
     project: Project
@@ -424,6 +442,7 @@ class Milestone:
     actual: object = None
     approved: object = None
     awarded: object = None  # tender only: construction award date, which means the tender already happened
+    in_construction: bool = False  # tender only: the project has reached construction, so the tender happened
 
     @property
     def is_deadline(self):
@@ -438,14 +457,14 @@ class Milestone:
     @property
     def late_days(self):
         """Tender only: days the tender went out (or, if still open, today) is past its deadline."""
-        if not self.is_deadline or (self.awarded and not self.actual):
+        if not self.is_deadline or (self.done and not self.actual):
             return None
         days = ((self.actual or timezone.localdate()) - self.forecast).days
         return days if days > 0 else None
 
     @property
     def done(self):
-        return self.actual is not None or self.awarded is not None
+        return self.actual is not None or self.awarded is not None or self.in_construction
 
     def state(self, today):
         if self.done:
@@ -469,6 +488,7 @@ class Milestone:
 def milestones(projects):
     """Every milestone of the given projects, from the MPSR status and latest PCCF."""
     events = []
+    in_construction = construction_check()
     for f in financials(projects):
         st = getattr(f.project, "current_status", None)
         for key, label, fc, ac, ap in MILESTONES:
@@ -481,7 +501,8 @@ def milestones(projects):
         due = tender_deadline(st)
         if due:
             events.append(Milestone(f.project, "tender", "Go to tender", st.actual_tender or due,
-                                    forecast=due, actual=st.actual_tender, awarded=st.actual_construction_award))
+                                    forecast=due, actual=st.actual_tender, awarded=st.actual_construction_award,
+                                    in_construction=in_construction(f.project, st)))
     return sorted(events, key=lambda e: (e.date, e.project.io_number))
 
 

@@ -938,6 +938,42 @@ class TenderConfirmTests(Base):
             self.assertIsNone(self.st.actual_tender, bad)
 
 
+class TenderInConstructionTests(Base):
+    _status = TenderMilestoneTests._status
+    _tender = TenderMilestoneTests._tender
+
+    def setUp(self):
+        super().setUp()
+        from .models import StageGate
+        self.design = StageGate.objects.create(name="99% Design", order=4)
+        self.constr = StageGate.objects.create(name="Construction", order=6)
+        self.close = StageGate.objects.create(name="Closeout", order=7)
+        self._status(actual_design_end=dt.date(2026, 1, 10))
+
+    def test_construction_stage_or_later_completes_tender(self):
+        self._status(stage=self.design)
+        self.assertFalse(self._tender().done)
+        for gate in (self.constr, self.close):
+            self._status(stage=gate)
+            t = self._tender()
+            self.assertTrue(t.done, gate.name)
+            self.assertIsNone(t.late_days)
+            self.assertIsNone(t.actual)                  # nothing invented: no tender date is recorded
+        self._status(stage=self.design)                  # moved back: open again
+        self.assertFalse(self._tender().done)
+
+    def test_construction_phase_completes_tender(self):
+        Project.objects.filter(pk=self.p.pk).update(phase=Project.Phase.CONSTRUCTION)
+        self.assertTrue(self._tender().done)
+
+    def test_shown_as_in_construction(self):
+        self._status(stage=self.constr)
+        r = self.client.get(f"/projects/{self.p.pk}/")
+        self.assertContains(r, "done (in construction)")
+        self.assertContains(r, "✓</span>In construction")
+        self.assertNotContains(r, "data-tender-confirm=")     # no tick button left to press
+
+
 class PCCFRequiredTests(Base):
     """Base project: approved PCCF 0 has Q1 1,000 + Q2 2,000 this year; the forecast has Q1 10 + Q2 20."""
 
@@ -1007,7 +1043,19 @@ class PCCFRequiredTests(Base):
         self.assertContains(r, "differs")
         self.assertContains(self.client.get("/mpsr/"), "⚠ Required")
         self.assertContains(self.client.get(f"/projects/{self.p.pk}/"), "PCCF required")
-        self.assertEqual(self.client.get("/").context["pccf_count"], 1)
+        r = self.client.get("/")
+        self.assertEqual(r.context["pccf_count"], 1)
+        self.assertContains(r, "PCCFs required")
+        self.assertContains(r, "forecast $30 vs approved $3,000")
+
+    def test_projects_list_filter(self):
+        other = Project.objects.create(io_number="1000002", title="Paint")
+        r = self.client.get("/projects/?show=pccf")
+        self.assertEqual([f.project.pk for f in r.context["rows"]], [self.p.pk])
+        self.assertContains(r, "PCCF required (1)")
+        r = self.client.get("/projects/")
+        self.assertEqual({f.project.pk for f in r.context["rows"]}, {self.p.pk, other.pk})
+        self.assertContains(r, "⚠ Required")
 
     def test_new_pccf_from_forecast_prefills_forecast(self):
         self._status(design_end=dt.date(2026, 6, 1), fiscal_year=2027)

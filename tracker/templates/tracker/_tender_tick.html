@@ -1,5 +1,5 @@
 {# Tick box for the "Go to tender" milestone. Needs: e (Milestone), next (where to come back to) #}
-{% if e.actual or not e.awarded %}
+{% if e.actual or not e.done %}
 <form method="post" action="/projects/{{ e.project.pk }}/tender/" class="tender-tick">{% csrf_token %}
   <input type="hidden" name="next" value="{{ next }}">
   {% if e.actual %}
@@ -12,7 +12,10 @@
       <span class="box"></span>Mark tendered</button>
   {% endif %}
 </form>
-{% else %}
+{% elif e.awarded %}
 <span class="tick on" style="cursor:default" title="Construction was awarded {{ e.awarded }}, so the tender has happened. Enter its exact date under actual dates if you have it.">
   <span class="box">✓</span>Awarded {{ e.awarded }}</span>
+{% else %}
+<span class="tick on" style="cursor:default" title="The project has reached construction, so the tender has happened. Enter its exact date under actual dates if you have it.">
+  <span class="box">✓</span>In construction</span>
 {% endif %}

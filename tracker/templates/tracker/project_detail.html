@@ -101,7 +101,7 @@
     {% for t in timeline %}
       <div class="row">
         {% if t.e.is_deadline %}
-        <div class="name">{{ t.e.label }}<small>{% if t.e.actual %}<span style="color:var(--good-ink);font-weight:700">✓</span> issued {{ t.e.actual }}{% elif t.e.done %}<span style="color:var(--good-ink);font-weight:700">✓</span> done (construction awarded){% elif t.e.css == 'missed' %}<span style="color:var(--crit-ink);font-weight:700">✗</span> deadline passed {{ t.e.forecast }}{% else %}deadline {{ t.e.forecast }}{% endif %}</small>
+        <div class="name">{{ t.e.label }}<small>{% if t.e.actual %}<span style="color:var(--good-ink);font-weight:700">✓</span> issued {{ t.e.actual }}{% elif t.e.done %}<span style="color:var(--good-ink);font-weight:700">✓</span> done ({% if t.e.awarded %}construction awarded{% else %}in construction{% endif %}){% elif t.e.css == 'missed' %}<span style="color:var(--crit-ink);font-weight:700">✗</span> deadline passed {{ t.e.forecast }}{% else %}deadline {{ t.e.forecast }}{% endif %}</small>
           <small>30 days after design end {{ status.actual_design_end }}{% if t.e.late_days %} · <span class="neg">{{ t.e.late_days }} day{{ t.e.late_days|pluralize }} late</span>{% endif %}</small>
           <div style="margin-top:4px">{% include "tracker/_tender_tick.html" with e=t.e next=request.get_full_path %}</div></div>
         {% else %}

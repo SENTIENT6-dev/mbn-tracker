@@ -20,7 +20,7 @@
     <div class="d">on the calendar</div></a>
   <a class="tile {% if overdue_count %}alert{% endif %}" href="/calendar/"><div class="k">Overdue milestones</div><div class="v">{{ overdue_count }}</div>
     <div class="d">forecast passed, no actual date</div></a>
-  <a class="tile {% if pccf_count %}warn{% endif %}" href="/mpsr/"><div class="k">PCCF required</div><div class="v">{{ pccf_count }}</div>
+  <a class="tile {% if pccf_count %}warn{% endif %}" href="/projects/?show=pccf"><div class="k">PCCF required</div><div class="v">{{ pccf_count }}</div>
     <div class="d">forecast differs from approved</div></a>
   <a class="tile" href="/change-orders/"><div class="k">Open change orders</div><div class="v">{{ open_cos }}</div>
     <div class="d">awaiting approval or processing</div></a>
@@ -96,7 +96,21 @@ Current forecast: {{ q.forecast|money }}"><div class="b a" style="height:{{ q.a_
             {% if f.budget_health == 'over' %} · over by {{ f.remaining_budget|abs|money }}{% endif %}</div>
           {% if f.pccf_required %}<div style="margin-top:3px"><span class="pill warn">⚠ PCCF required</span></div>{% endif %}
         </a>
-      {% empty %}<p class="muted">Nothing over budget, overdue or waiting on a PCCF.</p>{% endfor %}
+      {% empty %}<p class="muted">Nothing over budget or overdue.</p>{% endfor %}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>PCCFs required</h2>{% if pccf_count %}<span class="pill warn">{{ pccf_count }}</span>{% endif %}<span class="spacer"></span>
+        {% if pccf_count %}<a href="/projects/?show=pccf">All →</a>{% endif %}</div>
+      {% for f in pccf_rows %}
+        <div class="pccf-row">
+          <div style="min-width:0;flex:1"><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a>
+            <span class="ink2" style="font-size:12.5px">· {{ f.project.title|truncatechars:30 }}</span>
+            <ul>{% for r in f.pccf_reasons %}<li>{{ r.text }}</li>{% endfor %}</ul></div>
+          <a class="btn small" href="/projects/{{ f.project.pk }}/pccf/new/?from=forecast" title="New PCCF prefilled from the forecast">Start PCCF</a>
+        </div>
+      {% empty %}<p class="muted">Every forecast matches its approved PCCF.</p>{% endfor %}
+      {% if pccf_count > pccf_rows|length %}<p style="margin:8px 0 0;font-size:12.5px"><a href="/projects/?show=pccf">{{ pccf_count }} in total. See all →</a></p>{% endif %}
     </div>
 
     <div class="panel">

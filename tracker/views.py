@@ -58,8 +58,8 @@ def overview(request):
     upcoming = [e for e in events if not e.done and today <= e.date <= today + timedelta(days=90)]
     overdue = [e for e in events if e.overdue(today)]
     attention = sorted(
-        [f for f in rows if f.budget_health in ("over", "tight") or f.schedule["overdue"] or f.pccf_required],
-        key=lambda f: (f.budget_health != "over", not f.pccf_required, -f.schedule["overdue"], f.remaining_budget))
+        [f for f in rows if f.budget_health in ("over", "tight") or f.schedule["overdue"]],
+        key=lambda f: (f.budget_health != "over", -f.schedule["overdue"], f.remaining_budget))
 
     committed_pct = totals["commitments"] / totals["budget"] * 100 if totals["budget"] else 0
     invoiced_pct = totals["invoiced"] / totals["budget"] * 100 if totals["budget"] else 0
@@ -102,6 +102,7 @@ def overview(request):
         "rows": sorted(rows, key=lambda f: -f.budget), "totals": totals, "stages": stages,
         "upcoming": upcoming[:12], "upcoming_count": len(upcoming), "overdue_count": len(overdue),
         "attention": attention[:8], "today": today, "pccf_count": sum(f.pccf_required for f in rows),
+        "pccf_rows": [f for f in sorted(rows, key=lambda f: f.project.io_number) if f.pccf_required][:6],
         "committed_pct": committed_pct, "invoiced_pct": invoiced_pct,
         "open_cos": ChangeOrder.objects.filter(status__in=["requested", "approved"]).count(),
         "mpsr_done": MPSRReview.objects.filter(period=today.replace(day=1), project__in=projects).count(),
@@ -162,19 +163,23 @@ def dashboard(request):
     show = request.GET.get("show", "active")
     q = request.GET.get("q", "").strip()
     projects = Project.objects.select_related("project_manager", "current_status__stage")
-    if show == "active":
+    if show in ("active", "pccf"):
         projects = projects.filter(status__in=STATUS_FILTERS["active"])
     elif show == "review":
         projects = projects.filter(needs_review=True)
     if q:
         projects = projects.filter(Q(io_number__icontains=q) | Q(title__icontains=q) | Q(bgis_number__icontains=q))
     rows = financials(projects)
+    pccf_count = sum(f.pccf_required for f in rows) if show in ("active", "pccf") else None
+    if show == "pccf":
+        rows = [f for f in rows if f.pccf_required]
     health = schedule_health(milestones(projects), timezone.localdate())
     for f in rows:
         f.schedule = health.get(f.project.pk, {"overdue": 0, "next": None})
     totals = _totals(rows, "budget_with_fee", "budget", "commitments", "pending", "invoiced", "remaining_budget",
                      "vow_total", "to_be_billed")
-    return render(request, "tracker/projects.html", {"rows": rows, "totals": totals, "show": show, "q": q})
+    return render(request, "tracker/projects.html", {"rows": rows, "totals": totals, "show": show, "q": q,
+                                                     "pccf_count": pccf_count})
 
 
 # ------------------------------------------------------------------ projects

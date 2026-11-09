@@ -120,25 +120,7 @@ Current forecast: {{ q.forecast|money }}"><div class="b a" style="height:{{ q.a_
       </div>
     </div>
 
-    <div class="panel">
-      <div class="panel-head"><h2>Budget use by project</h2><span class="spacer"></span>
-        <div class="legend"><span><i style="background:var(--seq-1)"></i>Invoiced</span><span><i style="background:var(--seq-2)"></i>Committed, not invoiced</span>
-          <span><i class="lg-pen"></i>Pending COs</span><span><i class="lg-ovr"></i>Over budget</span><span class="muted">· full bar = budget (no fee)</span></div></div>
-      <table>
-        <thead><tr><th>Project</th><th style="width:42%">Budget (no fee) used</th><th class="n">Budget</th><th class="n">Uncommitted</th><th>Health</th></tr></thead>
-        <tbody>
-        {% for f in rows %}
-          <tr>
-            <td><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a><div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:38 }}</div></td>
-            <td>{% include "tracker/_budget_bar.html" with f=f %}</td>
-            <td class="n">{{ f.budget|money }}</td>
-            <td class="n {% if f.remaining_budget|neg %}neg{% endif %}">{{ f.remaining_budget|money }}</td>
-            <td class="nowrap">{% include "tracker/_health.html" with f=f %}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <p class="muted" style="font-size:12.5px;margin:4px 0 0">Budget use for each project is on <a href="/projects/">Projects</a>.</p>
   </div>
 
   <div>

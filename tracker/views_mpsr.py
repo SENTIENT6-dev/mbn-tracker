@@ -14,7 +14,7 @@ from django.utils import timezone
 from . import forms as F
 from .models import MPSRReview, Project, ProjectStatus, StatusHistory, ValueOfWork
 from .textutil import current_fiscal_year, fiscal_label
-from .services import (PCCF_DATES, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, milestones,
+from .services import (PCCF_DATES, TENDER_DAYS, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, milestones,
                        pccf_flag_message, project_financials)
 
 ZERO = Decimal("0")
@@ -89,7 +89,9 @@ def _date_fields(form, fin):
     for bound in form:
         approved = getattr(fin.pccf, bound.name, None) if fin.pccf else None
         out.append({"field": bound, "approved": approved, "target": bound.name in targets,
-                    "kpi": (bound.name, approved) in failed})
+                    "kpi": (bound.name, approved) in failed,
+                    # design end: going to tender (or award) by this date means the target was met
+                    "clear_by": approved + dt.timedelta(days=TENDER_DAYS) if approved else None})
     return out
 
 

@@ -27,6 +27,9 @@ Settings for any server (environment variables):
 | `MBN_SECRET_KEY` | Long random string, required when `MBN_DEBUG=0` |
 | `MBN_HOSTS` | The site's host name(s), comma-separated |
 | `MBN_DB` | Path of the SQLite database file |
+| `MBN_BACKUP_DIR` | Folder for backups (default: `backups` next to the tracker) |
+| `MBN_BACKUP_KEEP_DAYS` | How long daily backups are kept (default 30) |
+| `MBN_BACKUP_DAILY` | `0` turns the automatic daily backup off |
 
 ## Giving a copy to another PM
 1. Copy this folder **without** `db.sqlite3`, `db.backup-*.sqlite3` and `.venv`.
@@ -150,4 +153,11 @@ The import finishes by running `resolve_issues`, which fixes the known Access da
 ```
 
 ## Backups
-Copy `db.sqlite3` while the app is stopped.
+The tracker saves a copy of the database automatically the first time it's used each day, into the `backups`
+folder (not sent to GitHub). Daily copies are kept for 30 days. **Settings → Back up now** makes an extra copy,
+and one is also made before a fiscal-year rollover; those are kept until you delete them.
+
+To restore: close the tracker, rename `db.sqlite3` (to keep it), copy the backup in its place as `db.sqlite3`,
+and start the tracker again.
+
+To keep backups somewhere else, such as a OneDrive folder, set `MBN_BACKUP_DIR` (see the table above).

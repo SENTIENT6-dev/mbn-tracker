@@ -2,7 +2,7 @@ import datetime as dt
 from decimal import Decimal as D
 
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 
 from .models import (PCCF, Building, ChangeOrder, Company, CompanyType, Invoice, Person, Project, ProjectStatus,
                      Property, PurchaseOrder, StatusHistory, ValueOfWork)
@@ -1011,6 +1011,74 @@ class BudgetHealthTests(Base):
         self.assertEqual(self._health(), "over")
 
 
+class BackupTests(TransactionTestCase):
+    """Backups go to a temporary folder; the test database lives in memory, so it's allowed explicitly.
+    (A TransactionTestCase: copying the database waits forever on the open transaction a TestCase keeps.)"""
+
+    def setUp(self):
+        from .operations import set_owner
+        set_owner("Pat", "Manager", email="pat.manager@bgis.com")
+        Project.objects.create(io_number="1000001", title="Roof")
+        import tempfile
+        from unittest import mock
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        from django.test import override_settings
+        over = override_settings(BACKUP_DIR=self.tmp.name, BACKUP_KEEP_DAYS=30)
+        over.enable()
+        self.addCleanup(over.disable)
+        allow = mock.patch("tracker.backup._is_backupable", return_value=True)
+        allow.start()
+        self.addCleanup(allow.stop)
+
+    def _files(self):
+        from pathlib import Path
+        return sorted(p.name for p in Path(self.tmp.name).glob("db-*.sqlite3"))
+
+    def test_daily_backup_once_a_day_and_readable(self):
+        import sqlite3
+        from .backup import ensure_daily_backup
+        path = ensure_daily_backup(dt.date(2026, 11, 9))
+        self.assertIsNotNone(path)
+        self.assertIsNone(ensure_daily_backup(dt.date(2026, 11, 9)))   # already done today
+        self.assertEqual(len(self._files()), 1)
+        con = sqlite3.connect(str(path))                                # a real copy of the data
+        try:
+            self.assertEqual(con.execute("select io_number from tracker_project").fetchall(), [("1000001",)])
+        finally:
+            con.close()
+
+    def test_old_daily_copies_pruned_others_kept(self):
+        import os
+        import time
+        from pathlib import Path
+        from .backup import prune
+        old = time.mktime(dt.datetime(2026, 9, 1).timetuple())
+        for name in ("db-daily-20260901-080000.sqlite3", "db-manual-20260901-080000.sqlite3",
+                     "db-rollover-20260901-080000.sqlite3", "db-daily-20261101-080000.sqlite3"):
+            p = Path(self.tmp.name) / name
+            p.write_bytes(b"x")
+            if "0901" in name:
+                os.utime(p, (old, old))
+        self.assertEqual(prune(today=dt.date(2026, 11, 9)), 1)
+        self.assertEqual(self._files(), ["db-daily-20261101-080000.sqlite3", "db-manual-20260901-080000.sqlite3",
+                                         "db-rollover-20260901-080000.sqlite3"])
+
+    def test_back_up_now_and_list_on_settings(self):
+        r = self.client.post("/settings/", {"backup_now": "1"}, follow=True)
+        self.assertContains(r, "Backup saved: db-manual-")
+        self.assertTrue(any(n.startswith("db-manual-") for n in self._files()))
+        self.assertContains(r, "Back up now</td>")                      # listed with its type
+
+    def test_failed_backup_never_breaks_a_page(self):
+        from unittest import mock
+        from .backup import DailyBackupMiddleware
+        mw = DailyBackupMiddleware(lambda request: "page")
+        with mock.patch("tracker.backup.ensure_daily_backup", side_effect=OSError("disk full")), \
+                self.assertLogs("tracker.backup", level="ERROR"):
+            self.assertEqual(mw(None), "page")
+
+
 class SpendByQuarterTests(Base):
     """Base project: PCCF fee 10%. Forecast for FY 2026/27 (Apr 2026 - Mar 2027)."""
 
@@ -1244,6 +1312,32 @@ class KPIAndApproachingTests(Base):
         r = self.client.get("/")
         self.assertEqual(r.context["kpi_issue_count"], 1)
         self.assertContains(self.client.get("/projects/?show=kpi_issue"), "⚑ KPI issue")
+
+    def test_design_end_cleared_by_tender_or_award_within_30_days(self):
+        from .services import milestones
+        target = self.today - dt.timedelta(days=60)
+        PCCF.objects.filter(project=self.p).update(design_end=target)
+        ProjectStatus.objects.filter(project=self.p).update(design_end=target,
+                                                            actual_design_end=target + dt.timedelta(days=20))
+
+        def keys():
+            return [i.key for i in self._fin().kpi_issues]
+
+        def design():
+            return next(e for e in milestones([Project.objects.get(pk=self.p.pk)]) if e.key == "design")
+
+        self.assertEqual(keys(), ["design_end"])                         # design finished 20 days late
+        ProjectStatus.objects.filter(project=self.p).update(actual_tender=target + dt.timedelta(days=30))
+        self.assertEqual(keys(), [])                                      # tendered on day 30: not an issue
+        self.assertEqual(design().target_result, "met")
+        self.assertIn("within 30 days", design().target_text)
+        ProjectStatus.objects.filter(project=self.p).update(actual_tender=target + dt.timedelta(days=31))
+        self.assertEqual(keys(), ["design_end"])                         # day 31: too late
+        ProjectStatus.objects.filter(project=self.p).update(actual_tender=None, actual_design_end=None,
+                                                            actual_construction_award=target + dt.timedelta(days=5))
+        self.assertEqual(keys(), [])                                      # awarded in time, no design date
+        self.assertEqual(self.client.get(f"/mpsr/{self.p.pk}/").context["date_fields"][0]["clear_by"],
+                         target + dt.timedelta(days=30))
 
     def test_target_result_is_pass_fail(self):
         from .services import milestones

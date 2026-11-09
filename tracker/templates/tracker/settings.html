@@ -28,6 +28,30 @@
 </div>
 
 <div class="panel">
+  <div class="panel-head"><h2>Backups</h2><span class="spacer"></span>
+    <form method="post" style="margin:0">{% csrf_token %}<button class="btn primary" name="backup_now" value="1">Back up now</button></form></div>
+  <p class="ink2" style="margin-top:-6px">A copy of your data is saved automatically the first time you use the tracker each day.
+    Daily copies are kept for {{ keep_days }} days. Copies from "Back up now" and before a fiscal-year rollover are kept until you delete them.</p>
+  <p class="ink2">Saved in <code>{{ backup_dir }}</code></p>
+  {% if backups %}
+  <table class="compact">
+    <thead><tr><th>Saved</th><th>Type</th><th>File</th><th class="n">Size</th></tr></thead>
+    <tbody>{% for b in backups %}
+      <tr><td class="nowrap">{{ b.made|date:"Y-m-d H:i" }}</td><td>{{ b.kind_label }}</td><td><code>{{ b.name }}</code></td>
+        <td class="n">{{ b.size_mb|floatformat:1 }} MB</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">No backups yet.</p>{% endif %}
+  <details style="margin-top:12px"><summary>How to restore a backup</summary>
+    <ol style="margin:8px 0 0;padding-left:20px;line-height:1.7">
+      <li>Close the tracker (close its window, or stop <code>start.bat</code>).</li>
+      <li>Rename <code>db.sqlite3</code> in the tracker folder to keep it, e.g. <code>db-old.sqlite3</code>.</li>
+      <li>Copy the backup you want into the tracker folder and rename it <code>db.sqlite3</code>.</li>
+      <li>Start the tracker again.</li>
+    </ol></details>
+</div>
+
+<div class="panel">
   <div class="panel-head"><h2>Also here</h2></div>
   <p><a href="/issues/">Data issues</a> from the Access import</p>
 </div>

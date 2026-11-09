@@ -108,7 +108,8 @@
       <div class="mpsr-row">
         {% for d in date_fields %}
         <p class="date-check" data-approved="{{ d.approved|date:'Y-m-d' }}" data-target="{{ d.target|yesno:'1,' }}" data-kpi="{{ d.kpi|yesno:'1,' }}"
-           data-actual="act-actual_{{ d.field.name }}" data-today="{{ today|date:'Y-m-d' }}">
+           data-actual="act-actual_{{ d.field.name }}" data-today="{{ today|date:'Y-m-d' }}"
+           {% if d.field.name == 'design_end' and d.approved %}data-clear-by="{{ d.clear_by|date:'Y-m-d' }}"{% endif %}>
           {{ d.field.label_tag }}{{ d.field }}
           <span class="helptext">{% if d.approved %}Approved: {{ d.approved }}{% if d.target %} · target{% endif %}{% else %}No approved date{% endif %}</span>
           <span class="date-note" aria-live="polite"></span>{{ d.field.errors }}</p>
@@ -210,7 +211,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.date-check').forEach(p => {
     const input = p.querySelector('input'), note = p.querySelector('.date-note');
     const actualBox = document.querySelector(`[name="${p.dataset.actual}"]`);
-    const { approved, today } = p.dataset, target = !!p.dataset.target, kpi = !!p.dataset.kpi;
+    const { approved, today, clearBy } = p.dataset, target = !!p.dataset.target, kpi = !!p.dataset.kpi;
+    // design end: a tender issued (or construction awarded) within 30 days of the target means it was met
+    const clearBoxes = clearBy ? ['act-actual_tender', 'act-actual_construction_award']
+      .map(n => document.querySelector(`[name="${n}"]`)).filter(Boolean) : [];
     const say = (text, cls) => { note.textContent = text; if (cls) note.classList.add(cls); };
     const check = () => {
       note.className = 'date-note'; note.textContent = '';
@@ -220,6 +224,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (forecast && forecast !== approved) say('Differs from the approved date');
         return;
       }
+      if (clearBoxes.some(b => b.value && b.value <= clearBy))
+        return say('✓ Target met: went to tender within 30 days', 'ok');
       if (actual) return actual <= approved ? say('✓ Target met', 'ok')
                                             : say(kpi ? '✗ Target missed · KPI failure recorded' : '✗ Target missed: KPI issue', 'bad');
       if (approved < today) return say(kpi ? '✗ Target passed · KPI failure recorded'
@@ -227,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!forecast || forecast === approved) return say('✓ On track for the target', 'ok');
       say(`⚠ Differs from the target: submit a PCCF before ${approved} to change it`, 'warn');
     };
-    [input, actualBox].forEach(el => el && ['input', 'change'].forEach(ev => el.addEventListener(ev, check)));
+    [input, actualBox, ...clearBoxes].forEach(el => el && ['input', 'change'].forEach(ev => el.addEventListener(ev, check)));
     check();
   });
 });

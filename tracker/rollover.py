@@ -10,14 +10,10 @@ moves forward one year:
 
 The total stays the same. A forecast more than one year behind is moved forward one year at a time.
 """
-import datetime as dt
-import sqlite3
 from dataclasses import dataclass
 from decimal import Decimal
-from pathlib import Path
 
-from django.conf import settings
-from django.db import connection, transaction
+from django.db import transaction
 from django.utils import timezone
 
 from .models import Project, ProjectStatus, StatusHistory
@@ -98,20 +94,9 @@ def plan(statuses, to_year=None):
 
 
 def backup_database(label="rollover"):
-    """Copy the SQLite database into backups/ before a bulk change. Returns the file path (None if not SQLite)."""
-    db = settings.DATABASES["default"]
-    if db["ENGINE"] != "django.db.backends.sqlite3":
-        return None
-    folder = Path(settings.BASE_DIR) / "backups"
-    folder.mkdir(exist_ok=True)
-    target = folder / f"db-before-{label}-{dt.datetime.now():%Y%m%d-%H%M%S}.sqlite3"
-    connection.ensure_connection()
-    dest = sqlite3.connect(str(target))
-    try:
-        connection.connection.backup(dest)   # safe while the app is running
-    finally:
-        dest.close()
-    return target
+    """Copy the database into the backups folder before the rollover (see tracker/backup.py)."""
+    from .backup import backup_database as backup
+    return backup(label)
 
 
 def apply(plans):

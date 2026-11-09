@@ -169,7 +169,9 @@ def pccf_reasons(project, pccf, status, kpi_failures=()):
         out.append(PCCFReason("cash", f"FY {fy} cash flow" if fy else "This year's cash flow", approved, forecast))
     for field, label in PCCF_DATES:
         a, f = getattr(pccf, field), getattr(status, field)
-        achieved = getattr(status, f"actual_{field}")   # once it's happened, the forecast no longer matters
+        # once it's happened, the forecast no longer matters (for design end, a tender or award means it has)
+        achieved = getattr(status, f"actual_{field}") or (
+            field == "design_end" and (status.actual_tender or status.actual_construction_award))
         if a and f and a != f and not achieved and (field, a) not in failed:
             out.append(PCCFReason(field, label, a, f))
     return out
@@ -191,6 +193,16 @@ class KPIIssue:
         return f"{self.label} target {self.target} missed ({how})"
 
 
+def design_cleared_by(status, target):
+    """Design end target only: the actual tender (or construction award) date if it came within TENDER_DAYS of the
+    target. Going out to tender in that window means design finished in time, so the target isn't a KPI issue."""
+    if status is None or target is None:
+        return None
+    window = target + timedelta(days=TENDER_DAYS)
+    dates = [d for d in (status.actual_tender, status.actual_construction_award) if d and d <= window]
+    return min(dates) if dates else None
+
+
 def kpi_issues(project, pccf, status, kpi_failures=(), today=None):
     if pccf is None or status is None or not _reporting(project):
         return []
@@ -200,6 +212,8 @@ def kpi_issues(project, pccf, status, kpi_failures=(), today=None):
     for field, label in PCCF_DATES:
         target, actual = getattr(pccf, field), getattr(status, f"actual_{field}")
         if not target or (field, target) in failed:
+            continue
+        if field == "design_end" and design_cleared_by(status, target):
             continue
         if (actual and actual > target) or (not actual and target < today):
             out.append(KPIIssue(field, label, target, actual, getattr(status, field)))
@@ -644,6 +658,7 @@ class Milestone:
     awarded: object = None  # tender only: construction award date, which means the tender already happened
     in_construction: bool = False  # tender only: the project has reached construction, so the tender happened
     kpi_recorded: bool = False     # target dates only: this missed target is officially a KPI failure
+    cleared_by: object = None      # design end only: tender / award date within 30 days of the target
 
     @property
     def is_deadline(self):
@@ -695,6 +710,8 @@ class Milestone:
         """met / missed / pccf (still ahead, forecast differs: a PCCF can change it) / on_track; None if no target."""
         if not self.is_target:
             return None
+        if self.cleared_by:
+            return "met"
         if self.actual:
             return "met" if self.actual <= self.approved else "missed"
         if self.approved < timezone.localdate():
@@ -706,7 +723,8 @@ class Milestone:
     @property
     def target_text(self):
         missed = "✗ Target missed · KPI failure recorded" if self.kpi_recorded else "✗ Target missed: KPI issue"
-        return {"met": "✓ Target met", "missed": missed,
+        met = "✓ Target met (went to tender within 30 days)" if self.cleared_by else "✓ Target met"
+        return {"met": met, "missed": missed,
                 "pccf": f"⚠ Differs from target: PCCF needed before {self.approved}",
                 "on_track": "On track for target"}.get(self.target_result, "")
 
@@ -730,8 +748,9 @@ def milestones(projects):
             date = actual or forecast or approved
             if date:
                 recorded = any(k.milestone == ap and k.target == approved for k in f.kpi_failures)
+                cleared = design_cleared_by(st, approved) if key == "design" else None
                 events.append(Milestone(f.project, key, label, date, forecast, actual, approved,
-                                        kpi_recorded=recorded))
+                                        kpi_recorded=recorded, cleared_by=cleared))
         due = tender_deadline(st)
         if due:
             events.append(Milestone(f.project, "tender", "Go to tender", st.actual_tender or due,

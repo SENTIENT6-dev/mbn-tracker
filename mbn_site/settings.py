@@ -69,6 +69,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'tracker.setup.SitePasswordMiddleware',
     'tracker.setup.RequireOwnerMiddleware',
+    'tracker.backup.DailyBackupMiddleware',
 ]
 try:                                    # serves CSS/JS on a server; optional on a PC
     import whitenoise  # noqa: F401
@@ -151,6 +152,11 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default location of the Access file used by `manage.py import_access`
 ACCESS_SOURCE = os.environ.get('MBN_ACCESS_SOURCE', str(Path.home() / 'Downloads' / 'MBN.accdb'))
+
+# Backups of the database (see tracker/backup.py). MBN_BACKUP_DIR can point at e.g. a OneDrive folder.
+BACKUP_DIR = os.environ.get('MBN_BACKUP_DIR', str(BASE_DIR / 'backups'))
+BACKUP_KEEP_DAYS = int(os.environ.get('MBN_BACKUP_KEEP_DAYS', '30'))
+BACKUP_DAILY = os.environ.get('MBN_BACKUP_DAILY', '1') == '1'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

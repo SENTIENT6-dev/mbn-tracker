@@ -77,11 +77,22 @@ def settings_page(request):
                              initial={"source": (owner.access_source if owner and owner.access_source
                                                  else settings.ACCESS_SOURCE), "only_mine": True})
     if request.method == "POST":
+        if "backup_now" in request.POST:
+            from .backup import backup_database
+            path = backup_database("manual")
+            if path:
+                messages.success(request, f"Backup saved: {path.name}")
+            else:
+                messages.error(request, "This copy of the tracker doesn't use a database file, so there's nothing to back up.")
+            return redirect("settings")
         if "save_profile" in request.POST and profile.is_valid():
             set_owner(**profile.cleaned_data)
             messages.success(request, "Your details are saved.")
             return redirect("settings")
         if "run_import" in request.POST and imp.is_valid() and _run_import(request, imp, owner):
             return redirect("overview")
+    from .backup import backups
     return render(request, "tracker/settings.html", {"profile": profile, "imp": imp,
-                                                     "project_count": Project.objects.count()})
+                                                     "project_count": Project.objects.count(),
+                                                     "backups": backups()[:12], "backup_dir": settings.BACKUP_DIR,
+                                                     "keep_days": settings.BACKUP_KEEP_DAYS})

@@ -1,0 +1,8 @@
+{# Everything that needs action on a project, as small pills that wrap. Needs: f (Financials); f.overdue optional #}
+<div class="flags">
+  {% if f.pccf_required %}<span class="pill warn" title="{% for r in f.pccf_reasons %}{{ r.text }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}">⚠ PCCF</span>{% endif %}
+  {% for i in f.kpi_issues %}<span class="pill over" title="{{ i.text }}">⚑ KPI issue</span>{% endfor %}
+  {% for k in f.kpi_failures %}<span class="pill crit" title="{{ k.get_milestone_display }} target {{ k.target }} missed: {{ k.note }}">✗ KPI failure</span>{% endfor %}
+  {% for w in f.approaching %}<span class="pill blue" title="{{ w.text }}">⏱ {{ w.days }}d</span>{% endfor %}
+  {% if f.overdue %}<span class="pill overdue" title="Milestones whose forecast date passed with no actual date">✗ {{ f.overdue }} overdue</span>{% endif %}
+</div>

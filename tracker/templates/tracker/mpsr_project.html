@@ -81,17 +81,17 @@
 
   {# ---------------- right: what the PM updates #}
   <form method="post" class="mpsr-form stack">{% csrf_token %}
-    <div class="panel">
+    <div class="panel" id="mpsr-comment">
       <div class="panel-head"><h2>1 · Status comment</h2></div>
       <p class="ink2" style="margin:-6px 0 8px;font-size:12.5px">What happened this month and what's next. Starts with the current comment; edit or replace it.</p>
       {{ f.comment.text }}{{ f.comment.text.errors }}
     </div>
-    <div class="panel">
+    <div class="panel" id="mpsr-risk">
       <div class="panel-head"><h2>2 · Risk</h2></div>
       <p class="ink2" style="margin:-6px 0 8px;font-size:12.5px">Risks to budget, schedule or scope, and how they're being handled.</p>
       {{ f.risk.text }}{{ f.risk.text.errors }}
     </div>
-    <div class="panel">
+    <div class="panel" id="mpsr-actuals">
       <div class="panel-head"><h2>3 · Stage &amp; actual dates</h2></div>
       <div class="mpsr-row">
         <p>{{ f.act.stage.label_tag }}{{ f.act.stage }}{{ f.act.stage.errors }}</p>
@@ -103,7 +103,7 @@
         <p class="check">{{ f.act.final_mpsr }} {{ f.act.final_mpsr.label_tag }}</p>
       </div>
     </div>
-    <div class="panel">
+    <div class="panel" id="mpsr-dates">
       <div class="panel-head"><h2>4 · Forecast dates</h2>{% if fin.pccf %}<span class="spacer"></span><span class="muted" style="font-size:12px">Approved dates from PCCF {{ fin.pccf.submission }}</span>{% endif %}</div>
       <div class="mpsr-row">
         {% for d in date_fields %}
@@ -116,7 +116,7 @@
         {% endfor %}
       </div>
     </div>
-    <div class="panel">
+    <div class="panel" id="mpsr-cash">
       <div class="panel-head"><h2>5 · Forecast cash flow</h2><span class="spacer"></span>
         <div class="live-totals">
           {% if fin.pccf %}
@@ -142,7 +142,7 @@
         <p>{{ f.cash.future.label_tag }}{{ f.cash.future }}{{ f.cash.future.errors }}</p>
       </div>
     </div>
-    <div class="panel">
+    <div class="panel" id="mpsr-vow">
       <div class="panel-head"><h2>6 · Value of work</h2></div>
       <div class="mpsr-row">
         <p>{{ f.vow.reporting_date.label_tag }}{{ f.vow.reporting_date }}{{ f.vow.reporting_date.errors }}</p>

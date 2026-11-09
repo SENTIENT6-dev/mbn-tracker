@@ -18,32 +18,28 @@
 <div class="tablewrap">
 <table>
   <thead><tr>
-    <th>Project</th><th>Status</th><th>Stage</th><th style="min-width:210px">Budget used</th>
-    <th class="n">Budget (no fee)</th><th class="n">Committed</th><th class="n">Invoiced</th><th class="n">VOW</th>
-    <th class="n">Uncommitted</th><th>Health</th><th>PCCF / targets</th><th>Next milestone</th>
+    <th>Project</th><th style="min-width:150px">Flags</th><th>Status</th><th>Stage</th><th style="min-width:180px">Budget used</th>
+    <th class="n">Budget (no fee)</th><th class="n">Committed</th><th class="n">Invoiced</th>
+    <th class="n">Uncommitted</th><th>Health</th><th>Next milestone</th>
   </tr></thead>
   <tbody>
   {% for f in rows %}
     <tr>
       <td><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a>
-        <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:40 }}</div></td>
+        <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:36 }}</div></td>
+      <td>{% include "tracker/_flags.html" with f=f %}</td>
       <td><span class="pill {% if f.project.status == 1 %}blue{% endif %}">{{ f.project.get_status_display }}</span></td>
       <td class="nowrap">{{ f.project.current_status.stage|default:"–" }}</td>
       <td>{% include "tracker/_budget_bar.html" with f=f %}</td>
       <td class="n">{{ f.budget|money }}</td>
       <td class="n">{{ f.commitments|money }}</td>
       <td class="n">{{ f.invoiced|money }}</td>
-      <td class="n">{{ f.vow_total|money }}</td>
       <td class="n {% if f.remaining_budget|neg %}neg{% endif %}">{{ f.remaining_budget|money }}</td>
       <td class="nowrap">{% include "tracker/_health.html" with f=f %}</td>
-      <td class="nowrap">{% if f.pccf_required %}<a class="pill warn" href="/projects/{{ f.project.pk }}/" title="{% for r in f.pccf_reasons %}{{ r.text }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}">⚠ Required</a>{% endif %}
-        {% for w in f.approaching %}<span class="pill blue" title="{{ w.text }}">⏱ {{ w.days }}d</span>{% endfor %}
-        {% for i in f.kpi_issues %}<span class="pill over" title="{{ i.text }}">⚑ KPI issue</span>{% endfor %}
-        {% for k in f.kpi_failures %}<span class="pill crit" title="{{ k.get_milestone_display }} target {{ k.target }} missed: {{ k.note }}">✗ KPI failure</span>{% endfor %}</td>
       <td class="nowrap">{% if f.schedule.next %}{{ f.schedule.next.label }}<div class="ink2" style="font-size:12px">{{ f.schedule.next.date }}</div>{% else %}<span class="muted">–</span>{% endif %}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="12" class="muted">{% if show == 'pccf' %}No projects need a PCCF.{% elif show == 'approaching' %}No approved target dates in the next 15 days.{% elif show == 'kpi' %}No KPI failures recorded.{% else %}No projects match.{% endif %}</td></tr>
+    <tr><td colspan="11" class="muted">{% if show == 'pccf' %}No projects need a PCCF.{% elif show == 'approaching' %}No approved target dates in the next 15 days.{% elif show == 'kpi' %}No KPI failures recorded.{% else %}No projects match.{% endif %}</td></tr>
   {% endfor %}
   </tbody>
 </table>

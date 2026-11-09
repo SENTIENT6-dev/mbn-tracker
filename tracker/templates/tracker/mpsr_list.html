@@ -24,24 +24,19 @@
 </div>
 
 <div class="tablewrap"><table>
-  <thead><tr><th style="width:36px"></th><th>Project</th><th>Stage</th><th style="min-width:170px">Budget used</th>
-    <th class="n">VOW</th><th>Last comment</th><th>Overdue</th><th>PCCF / targets</th><th></th></tr></thead>
+  <thead><tr><th style="width:36px"></th><th>Project</th><th style="min-width:150px">Flags</th><th>Stage</th>
+    <th style="min-width:150px">Budget used</th><th>Last comment</th><th></th></tr></thead>
   <tbody>{% for f in rows %}
     <tr class="{% if f.reviewed_at %}mpsr-done{% endif %}">
       <td>{% if f.reviewed_at %}<span class="mark done" title="Done {{ f.reviewed_at|date:'Y-m-d H:i' }}">✓</span>{% else %}<span class="mark todo" title="Not done yet"></span>{% endif %}</td>
       <td><a href="/mpsr/{{ f.project.pk }}/?period={{ period|date:'Y-m' }}"><strong>{{ f.project.io_number }}</strong></a>
-        <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:48 }}</div></td>
+        <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:36 }}</div></td>
+      <td>{% include "tracker/_flags.html" with f=f %}</td>
       <td class="nowrap">{{ f.project.current_status.stage|default:"–" }}</td>
       <td>{% include "tracker/_budget_bar.html" with f=f %}</td>
-      <td class="n">{{ f.vow_total|money }}<div class="muted" style="font-size:11.5px">{{ f.vow.reporting_date|default:"never" }}</div></td>
       <td class="nowrap">{% if f.last_comment %}{{ f.last_comment|date:"Y-m-d" }}{% else %}<span class="muted">never</span>{% endif %}</td>
-      <td>{% if f.overdue %}<span class="pill overdue">✗ {{ f.overdue }}</span>{% endif %}</td>
-      <td class="nowrap">{% if f.pccf_required %}<span class="pill warn" title="{% for r in f.pccf_reasons %}{{ r.text }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}">⚠ Required</span>{% endif %}
-        {% for w in f.approaching %}<span class="pill blue" title="{{ w.text }}">⏱ {{ w.days }}d</span>{% endfor %}
-        {% for i in f.kpi_issues %}<span class="pill over" title="{{ i.text }}">⚑ KPI issue</span>{% endfor %}
-        {% for k in f.kpi_failures %}<span class="pill crit" title="{{ k.get_milestone_display }} target {{ k.target }} missed: {{ k.note }}">✗ KPI failure</span>{% endfor %}</td>
       <td class="nowrap"><a class="btn small {% if not f.reviewed_at %}primary{% endif %}" href="/mpsr/{{ f.project.pk }}/?period={{ period|date:'Y-m' }}">{% if f.reviewed_at %}Review again{% else %}Open{% endif %}</a></td>
     </tr>
-  {% empty %}<tr><td colspan="9" class="muted">No active projects.</td></tr>{% endfor %}</tbody>
+  {% empty %}<tr><td colspan="7" class="muted">No active projects.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endblock %}

@@ -261,15 +261,7 @@ def project_detail(request, pk):
         "history": project.status_history.all()[:100],
         "vows": project.vow_entries.all()[:12],
         "issues": project.dataissue_set.filter(resolved=False),
-        "cash_form": F.CashFlowForm(instance=status, prefix="cash"),
-        "dates_form": F.ForecastDatesForm(instance=status, prefix="dates"),
-        "actuals_form": F.ActualsForm(instance=status, prefix="act"),
-        "comment_form": F.CommentForm(prefix="comment"),
-        "risk_form": F.CommentForm(prefix="risk"),
-        "vow_form": F.VOWForm(prefix="vow", initial={
-            "reporting_date": timezone.localdate(),
-            "previous_years_with_fees": (fin.vow_previous * (1 + fin.fee_percent / 100)).quantize(Decimal("0.01")),
-            "current_year_no_fees": fin.vow_current_year}),
+        # forecasts, dates, comments, risk and value of work are edited on the MPSR page only (one set of rules)
     }
     return render(request, "tracker/project_detail.html", ctx)
 

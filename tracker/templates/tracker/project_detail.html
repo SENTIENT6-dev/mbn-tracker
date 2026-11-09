@@ -125,13 +125,9 @@ Actual: {{ t.e.actual }}">✓</span>{% endif %}
     {% endfor %}
   </div>
   {% else %}<p class="muted">No milestone dates yet.</p>{% endif %}
-  <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px">
-    <details><summary>Update forecast dates</summary>
-      <form method="post" action="/projects/{{ project.pk }}/update/dates/" class="stack cols" style="margin-top:10px;min-width:min(640px,80vw)">{% csrf_token %}
-        {{ dates_form.as_p }}<p class="full"><button class="btn primary">Save forecast dates</button></p></form></details>
-    <details><summary>Record actual dates &amp; stage</summary>
-      <form method="post" action="/projects/{{ project.pk }}/update/act/" class="stack cols" style="margin-top:10px;min-width:min(640px,80vw)">{% csrf_token %}
-        {{ actuals_form.as_p }}<p class="full"><button class="btn primary">Save actuals</button></p></form></details>
+  <div class="mpsr-links">
+    <a href="/mpsr/{{ project.pk }}/#mpsr-dates">Update forecast dates in MPSR →</a>
+    <a href="/mpsr/{{ project.pk }}/#mpsr-actuals">Record actual dates &amp; stage in MPSR →</a>
   </div>
 </div>
 
@@ -178,9 +174,7 @@ Actual: {% if q.state == 'later' %}not started{% else %}{{ q.actual|money }} (in
       </tbody>
     </table>
     {% include "tracker/_approved_note.html" %}
-    <details style="margin-top:12px"><summary>Update forecast</summary>
-      <form method="post" action="/projects/{{ project.pk }}/update/cash/" class="stack cols" style="margin-top:10px">{% csrf_token %}
-        {{ cash_form.as_p }}<p class="full"><button class="btn primary">Save cash flow</button></p></form></details>
+    <div class="mpsr-links"><a href="/mpsr/{{ project.pk }}/#mpsr-cash">Update the forecast in MPSR →</a></div>
   </div>
 
   <div class="panel">
@@ -194,9 +188,7 @@ Actual: {% if q.state == 'later' %}not started{% else %}{{ q.actual|money }} (in
       <dt>To be billed</dt><dd class="{% if fin.to_be_billed|neg %}neg{% endif %}">{{ fin.to_be_billed|money }}</dd>
       <dt>Last reported</dt><dd>{{ fin.vow.reporting_date|default:"never" }}</dd>
     </dl>
-    <details style="margin-top:14px"><summary>Record value of work</summary>
-      <form method="post" action="/projects/{{ project.pk }}/update/vow/" class="stack cols wide" style="margin-top:10px">{% csrf_token %}
-        {{ vow_form.as_p }}<p class="full"><button class="btn primary">Save VOW</button></p></form></details>
+    <div class="mpsr-links"><a href="/mpsr/{{ project.pk }}/#mpsr-vow">Record value of work in MPSR →</a></div>
   </div>
 </div>
 
@@ -204,16 +196,12 @@ Actual: {% if q.state == 'later' %}not started{% else %}{{ q.actual|money }} (in
   <div class="panel">
     <div class="panel-head"><h2>Status comment</h2></div>
     <div class="pre" style="margin-bottom:12px">{{ status.comments|default:"No comment yet." }}</div>
-    <details><summary>Write a new comment</summary>
-      <form method="post" action="/projects/{{ project.pk }}/update/comment/" class="stack" style="margin-top:10px">{% csrf_token %}
-        {{ comment_form.as_p }}<button class="btn primary">Save comment</button></form></details>
+    <div class="mpsr-links"><a href="/mpsr/{{ project.pk }}/#mpsr-comment">Write a new comment in MPSR →</a></div>
   </div>
   <div class="panel">
     <div class="panel-head"><h2>Risk</h2></div>
     <div class="pre" style="margin-bottom:12px">{{ status.risk|default:"No risk noted." }}</div>
-    <details><summary>Update risk</summary>
-      <form method="post" action="/projects/{{ project.pk }}/update/risk/" class="stack" style="margin-top:10px">{% csrf_token %}
-        {{ risk_form.as_p }}<button class="btn primary">Save risk</button></form></details>
+    <div class="mpsr-links"><a href="/mpsr/{{ project.pk }}/#mpsr-risk">Update risk in MPSR →</a></div>
   </div>
 </div>
 

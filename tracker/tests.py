@@ -1490,7 +1490,7 @@ class PCCFRequiredTests(Base):
         self.assertContains(r, "PCCF required: the forecast no longer matches approved PCCF 0")
         self.assertContains(r, f"/projects/{self.p.pk}/pccf/new/?from=forecast")
         self.assertContains(r, "differs")
-        self.assertContains(self.client.get("/mpsr/"), "⚠ Required")
+        self.assertContains(self.client.get("/mpsr/"), "⚠ PCCF")
         self.assertContains(self.client.get(f"/projects/{self.p.pk}/"), "PCCF required")
         r = self.client.get("/")
         self.assertEqual(r.context["pccf_count"], 1)
@@ -1504,7 +1504,7 @@ class PCCFRequiredTests(Base):
         self.assertContains(r, "PCCF required (1)")
         r = self.client.get("/projects/")
         self.assertEqual({f.project.pk for f in r.context["rows"]}, {self.p.pk, other.pk})
-        self.assertContains(r, "⚠ Required")
+        self.assertContains(r, "⚠ PCCF")
 
     def test_new_pccf_from_forecast_prefills_forecast(self):
         self._status(design_end=dt.date(2026, 6, 1), fiscal_year=2027)

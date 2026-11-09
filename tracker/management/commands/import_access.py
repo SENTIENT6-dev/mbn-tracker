@@ -4,8 +4,8 @@ Usage:  python manage.py import_access [--source PATH] [--reset]
 
 The Access file is copied to a temp folder and read from the copy, so the
 original is never opened or locked. Anything that cannot be imported cleanly
-(duplicates, records pointing at deleted projects/POs, odd dates) is recorded
-as a DataIssue for review on the "Data issues" page.
+(duplicates, records pointing at deleted projects/POs, odd dates) is noted while
+importing and fixed where the data allows (see _import_fixes.py); nothing is stored.
 """
 import datetime as dt
 import shutil
@@ -20,17 +20,17 @@ except ImportError:          # hosted (Linux) copies have no Access driver
     pyodbc = None
 from django.conf import settings
 from tracker.textutil import combine_notes
-from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from tracker.models import (PCCF, Building, BuildingRole, ChangeOrder, Company, CompanyType, DataIssue,
+from tracker.models import (PCCF, Building, BuildingRole, ChangeOrder, Company, CompanyType,
                             HeritageStatus, Invoice, Owner, Person, Project, ProjectStatus, Property, PurchaseOrder,
                             RoleType, StageGate, StatusHistory, ValueOfWork, po_label)
 
+from ._import_fixes import HIGH as H, LOW as L, MEDIUM as M, ImportIssue, resolve
+
 ZERO = Decimal("0")
-H, M, L = DataIssue.Severity.HIGH, DataIssue.Severity.MEDIUM, DataIssue.Severity.LOW
 
 
 def s(v):
@@ -107,7 +107,7 @@ class Command(BaseCommand):
                 if reset:
                     self.wipe()
                 self.run()
-                DataIssue.objects.bulk_create(self.issues)
+                fixed, left = resolve(self.issues)   # fix the known Access data problems
                 if self.keep_owner:
                     from tracker.operations import set_owner
                     o = set_owner(**self.keep_owner)
@@ -122,13 +122,13 @@ class Command(BaseCommand):
 
         counts = {m.__name__: m.objects.count() for m in
                   (Company, Person, Property, Building, BuildingRole, Project, PCCF, PurchaseOrder, Invoice, ChangeOrder,
-                   ProjectStatus, StatusHistory, ValueOfWork, DataIssue)}
+                   ProjectStatus, StatusHistory, ValueOfWork)}
         for k, v in counts.items():
             self.stdout.write(f"  {k:<15} {v}")
         if self.pm_key:
             self.stdout.write(f"  Only projects managed by {pm} (skipped {len(self.skipped)} others).")
+        self.stdout.write(f"  Access data problems found: {len(self.issues)}, fixed or explained: {fixed}.")
         self.stdout.write(self.style.SUCCESS("Import finished."))
-        call_command("resolve_issues", stdout=self.stdout)
 
     # ------------------------------------------------------------ helpers
     def rows(self, sql):
@@ -137,11 +137,11 @@ class Command(BaseCommand):
         return [dict(zip(cols, r)) for r in self.cur.fetchall()]
 
     def issue(self, category, severity, summary, detail=None, project=None):
-        self.issues.append(DataIssue(category=category, severity=severity, summary=summary,
-                                     detail=detail or {}, project=project))
+        self.issues.append(ImportIssue(category=category, severity=severity, summary=summary,
+                                       detail=detail or {}, project=project))
 
     def wipe(self):
-        for m in (Owner, DataIssue, StatusHistory, ValueOfWork, ProjectStatus, ChangeOrder, Invoice, PurchaseOrder,
+        for m in (Owner, StatusHistory, ValueOfWork, ProjectStatus, ChangeOrder, Invoice, PurchaseOrder,
                   PCCF, Project, StageGate, BuildingRole, RoleType, Building, HeritageStatus, Property, Person,
                   Company, CompanyType):
             m.objects.all().delete()
@@ -467,8 +467,6 @@ class Command(BaseCommand):
 
     def checks(self):
         from tracker.operations import merge_duplicate_people
-        from tracker.services import flag_out_of_order_schedules
-        flag_out_of_order_schedules()   # current PCCFs whose milestone dates go backwards
         for kept, n in merge_duplicate_people(Project.pm_company()):   # BGIS staff entered twice in Access
             self.issue("Duplicate person merged", L,
                        f"{kept} was in Access {n + 1} times at BGIS; merged into one record with all their projects.")

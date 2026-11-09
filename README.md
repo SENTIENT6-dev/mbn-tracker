@@ -57,7 +57,6 @@ Set `MBN_DB` to another file path to try things on a copy of the database.
 | Change orders | Pending_changes form |
 | Vendors | Every company with POs, committed/invoiced totals, invoicing per year, contacts; add, edit, merge, delete |
 | Facilities | Buildings (8,500+) and properties tables with search, building contacts (FM, PREM…) and projects per building |
-| Data issues | Problems found while importing from Access, and how each was resolved |
 
 ### Invoice limits
 When adding an invoice (Invoices tab or a PO page) the form shows, for the chosen PO:
@@ -98,8 +97,7 @@ Hover over any bar, chart or calendar entry for its details.
   and future years), notes. Confirmed drawings, revised occupancy, estimate class and stream were removed.
 - **Approved schedule dates must be in order**: charter approval ≤ design start ≤ design end ≤ construction
   award ≤ substantial performance ≤ closeout (blank dates are skipped). Dates out of order turn red and Save is
-  blocked. Projects whose *current* PCCF from Access breaks this are listed on Data issues; the flag clears
-  when the PCCF is saved with corrected dates.
+  blocked.
 - **Fee amount is calculated, not typed**: (design + construction + both contingencies) × fee %, to the cent.
   It's shown read-only and updates as you type; the server recalculates it on save.
 - **Amounts are shown in financial format** (1,234,567.89) in every form. You can type `1234567.89`,
@@ -144,8 +142,8 @@ The calendar uses the MPSR forecast date, or the approved PCCF date when there's
 `MBN_ACCESS_SOURCE`), so the original is never touched. Use `--source <path>` for a different file.
 `--reset` **replaces everything** in this app, including any work done here since the last import.
 `reconcile_access` compares each project's totals with Access's `Project_Financials` query.
-The import finishes by running `resolve_issues`, which fixes the known Access data problems
-(e.g. mistyped invoice dates, POs left on deleted projects) and records the reasoning on the Data issues page.
+While importing, the known Access data problems (e.g. mistyped invoice dates, records left on deleted
+projects, duplicate entries) are fixed automatically (`_import_fixes.py`); nothing about them is stored.
 
 ## Tests
 ```

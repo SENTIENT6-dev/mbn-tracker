@@ -1,7 +1,7 @@
 """Compare the new app's project figures with Access's Project_Financials query.
 
 Usage:  python manage.py reconcile_access [--source PATH]
-Every difference should be explained by a DataIssue (duplicates removed, etc.).
+Every difference should be explained by a known Access data problem the import fixed (duplicates removed, etc.).
 """
 import shutil
 import tempfile

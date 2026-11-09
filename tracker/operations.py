@@ -10,7 +10,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import (PCCF, BuildingRole, ChangeOrder, DataIssue, Invoice, Person, Project, PurchaseOrder,
+from .models import (PCCF, BuildingRole, ChangeOrder, Invoice, Person, Project, PurchaseOrder,
                      StatusHistory, ValueOfWork)
 
 ZERO = Decimal("0")
@@ -43,7 +43,6 @@ def delete_project(project):
     Invoice.objects.filter(po__in=pos).delete()
     ChangeOrder.objects.filter(po__in=pos).delete()
     pos.delete()
-    DataIssue.objects.filter(project=project).update(project=None)
     project.delete()  # cascades PCCFs, status, history, VOW
 
 

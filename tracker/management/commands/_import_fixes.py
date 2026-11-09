@@ -1,16 +1,15 @@
-"""Resolve the data issues found by the Access import, based on evidence in the data.
+"""Fixes for the known problems in Access data, applied while `import_access` runs.
 
-Usage:  python manage.py resolve_issues
-Runs automatically at the end of `import_access`. Safe to run more than once.
-Each resolved issue gets a note explaining what was decided and why.
+The import notes each problem it finds (a duplicate invoice, a mistyped date, records left on a deleted
+project...) as an ImportIssue; `resolve(issues)` then fixes what the data allows. Nothing is stored: the
+tracker no longer keeps a list of import problems.
 """
-import datetime as dt
+from dataclasses import dataclass, field
 from decimal import Decimal
 
-from django.core.management.base import BaseCommand
-from django.db import transaction
+from tracker.models import PCCF, Invoice, Project, PurchaseOrder, po_label
 
-from tracker.models import PCCF, DataIssue, Invoice, Project, PurchaseOrder, po_label  # noqa: F401
+HIGH, MEDIUM, LOW = "high", "medium", "low"
 
 # Invoice dates mistyped in Access, keyed (PO, invoice #[, wrong date]) -> right date.
 # The real list is specific to one PM's data, so it lives in _local_fixes.py (not published).
@@ -23,24 +22,38 @@ MONEY_KEYS = {"DesignCost": "design_cost", "ConstrCost": "construction_cost", "D
               "ConstrCont": "construction_contingency", "Fee": "fee"}
 
 
+@dataclass
+class ImportIssue:
+    """A problem found in the Access data during an import (kept in memory only)."""
+    category: str
+    severity: str
+    summary: str
+    detail: dict = field(default_factory=dict)
+    project: object = None
+    resolved: bool = False
+    resolution_note: str = ""
+
+    def save(self):
+        pass   # nothing is stored
+
+
 def close(issue, note):
     issue.resolved = True
     issue.resolution_note = note[:500]
-    issue.save()
 
 
-class Command(BaseCommand):
-    help = "Resolve Access-import data issues"
+def resolve(issues):
+    """Apply the fix for each issue the data allows. Returns (fixed, left) counts."""
+    fixer = Fixes()
+    for issue in issues:
+        handler = getattr(fixer, "h_" + issue.category.lower().replace(" ", "_").replace("-", "_"), None)
+        if handler:
+            handler(issue)
+    fixed = sum(i.resolved for i in issues)
+    return fixed, len(issues) - fixed
 
-    @transaction.atomic
-    def handle(self, *args, **opts):
-        before = DataIssue.objects.filter(resolved=False).count()
-        for issue in DataIssue.objects.filter(resolved=False).select_related("project"):
-            handler = getattr(self, "h_" + issue.category.lower().replace(" ", "_").replace("-", "_"), None)
-            if handler:
-                handler(issue)
-        after = DataIssue.objects.filter(resolved=False).count()
-        self.stdout.write(self.style.SUCCESS(f"Resolved {before - after} issue(s); {after} still open."))
+
+class Fixes:
 
     # ---------------------------------------------------------------- handlers
     def h_duplicate_invoice(self, i):

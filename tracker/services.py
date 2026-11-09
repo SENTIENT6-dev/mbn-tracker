@@ -530,35 +530,6 @@ def schedule_problems(get):
     return out
 
 
-def flag_out_of_order_schedules():
-    """Raise a data issue for each project whose current PCCF has milestone dates out of order."""
-    from .models import DataIssue
-    latest = {}
-    for pc in PCCF.objects.select_related("project").order_by("project_id", "submission"):
-        latest[pc.project_id] = pc
-    made = 0
-    for pc in latest.values():
-        probs = schedule_problems(lambda f: getattr(pc, f))
-        if not probs or DataIssue.objects.filter(category="Schedule dates out of order", resolved=False,
-                                                 detail__pccf_id=pc.pk).exists():
-            continue
-        text = "; ".join(f"{ll} {ld} is before {pl} {pd}" for pf, pl, pd, lf, ll, ld in probs)
-        DataIssue.objects.create(
-            category="Schedule dates out of order", severity=DataIssue.Severity.MEDIUM, project=pc.project,
-            summary=f"{pc.project.io_number} PCCF {pc.submission} (current budget): {text}. "
-                    f"Edit the PCCF to correct the dates.",
-            detail={"pccf_id": pc.pk})
-        made += 1
-    return made
-
-
-def resolve_schedule_issue(pc):
-    """Close the out-of-order flag for a PCCF once its dates are in order."""
-    from .models import DataIssue
-    if not schedule_problems(lambda f: getattr(pc, f)):
-        DataIssue.objects.filter(category="Schedule dates out of order", resolved=False,
-                                 detail__pccf_id=pc.pk).update(resolved=True,
-                                                               resolution_note="Dates corrected on the PCCF.")
 
 
 def invoice_room(pos, exclude_invoice=None):

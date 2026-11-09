@@ -397,7 +397,6 @@ details>summary::-webkit-details-marker{display:none}
   <a href="/vendors/" class="{% if '/vendors/' in p or '/people/' in p %}on{% endif %}"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6 6 0 0 1 3.5 5.5"/></svg>Vendors</a>
   <a href="/facilities/" class="{% if '/facilities/' in p %}on{% endif %}"><svg viewBox="0 0 24 24"><path d="M4 21V5l8-2v18M12 8l8 2.5V21M2 21h20M7 8h2M7 12h2M7 16h2M15 13h2M15 17h2"/></svg>Facilities</a>
   <span class="sep"></span>
-  <a href="/issues/" class="{% if '/issues/' in p %}on{% endif %}"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg>Data issues</a>
   {% if me %}<a href="/settings/" class="me" title="Settings"><span class="av">{{ me.first_name|first }}{{ me.last_name|first }}</span>
     <span>{{ me }}<small>{{ me.position|default:"Project Manager" }} · Settings</small></span></a>{% endif %}
   {% if site_password %}<a href="/logout/" style="font-size:12.5px;opacity:.75;padding-top:2px;padding-bottom:2px">Sign out</a>{% endif %}

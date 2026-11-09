@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -12,11 +12,11 @@ from django.views.decorators.http import require_POST
 
 from . import forms as F
 from .textutil import current_fiscal_year, fiscal_label
-from .models import (PCCF, ChangeOrder, DataIssue, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
+from .models import (PCCF, ChangeOrder, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
                      PurchaseOrder, StageGate, StatusHistory, ValueOfWork)
 from .operations import save_change_order
 from .services import (spend_by_quarter, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
-                       resolve_schedule_issue, schedule_health)
+                       schedule_health)
 
 ZERO = Decimal("0")
 STATUS_FILTERS = {
@@ -113,7 +113,6 @@ def overview(request):
         "committed_pct": committed_pct, "invoiced_pct": invoiced_pct,
         "open_cos": ChangeOrder.objects.filter(status__in=["requested", "approved"]).count(),
         "mpsr_done": MPSRReview.objects.filter(period=today.replace(day=1), project__in=projects).count(),
-        "open_issues": DataIssue.objects.filter(resolved=False).count(),
     })
 
 
@@ -260,7 +259,6 @@ def project_detail(request, pk):
         "change_orders": ChangeOrder.objects.filter(po__project=project).select_related("po__vendor"),
         "history": project.status_history.all()[:100],
         "vows": project.vow_entries.all()[:12],
-        "issues": project.dataissue_set.filter(resolved=False),
         # forecasts, dates, comments, risk and value of work are edited on the MPSR page only (one set of rules)
         "reported": _reported(project) if tab == "history" else [],
     }
@@ -501,7 +499,6 @@ def pccf_form(request, pk, pccf_id=None):
                     .values_list("submission", flat=True).first()
                 obj.submission = 0 if adding_charter or top is None else top + 1
             obj.save()
-            resolve_schedule_issue(obj)
         messages.success(request, f"PCCF {obj.submission} saved (total budget ${obj.total_budget:,.2f})")
         return redirect(f"/projects/{pk}/?tab=budget")
     last = project.pccfs.order_by("-submission").first()
@@ -598,25 +595,4 @@ def pending_changes(request):
         .select_related("po__project", "po__vendor")
     return render(request, "tracker/pending.html", {"change_orders": cos})
 
-
-# ------------------------------------------------------------------ data issues
-
-def issues(request):
-    show_resolved = request.GET.get("resolved") == "1"
-    qs = DataIssue.objects.select_related("project").filter(resolved=show_resolved).annotate(
-        rank=Case(When(severity="high", then=Value(0)), When(severity="medium", then=Value(1)), default=Value(2),
-                  output_field=IntegerField())).order_by("rank", "category", "id")
-    return render(request, "tracker/issues.html", {
-        "issues": qs, "show_resolved": show_resolved,
-        "open_count": DataIssue.objects.filter(resolved=False).count(),
-        "resolved_count": DataIssue.objects.filter(resolved=True).count()})
-
-
-@require_POST
-def issue_toggle(request, pk):
-    issue = get_object_or_404(DataIssue, pk=pk)
-    issue.resolved = not issue.resolved
-    issue.resolution_note = request.POST.get("note", issue.resolution_note)[:500]
-    issue.save()
-    return redirect(request.POST.get("next") or "issues")
 

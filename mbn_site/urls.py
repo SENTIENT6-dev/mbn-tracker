@@ -82,7 +82,5 @@ urlpatterns = [
     path("logout/", site.logout_view, name="logout"),
 
     # misc
-    path("issues/", v.issues, name="issues"),
-    path("issues/<int:pk>/toggle/", v.issue_toggle, name="issue_toggle"),
     path("admin/", admin.site.urls),
 ]

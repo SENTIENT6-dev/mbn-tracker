@@ -523,25 +523,3 @@ class Owner(models.Model):
     def current(cls):
         return cls.objects.select_related("person__company").first()
 
-
-class DataIssue(models.Model):
-    """Something the Access migration could not import cleanly and needs a decision."""
-
-    class Severity(models.TextChoices):
-        HIGH = "high", "Affects totals"
-        MEDIUM = "medium", "Needs review"
-        LOW = "low", "Information"
-
-    category = models.CharField(max_length=100)
-    severity = models.CharField(max_length=10, choices=Severity.choices)
-    summary = models.CharField(max_length=500)
-    detail = models.JSONField(default=dict, blank=True)
-    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True)
-    resolved = models.BooleanField(default=False)
-    resolution_note = models.CharField(max_length=500, blank=True)
-
-    class Meta:
-        ordering = ["resolved", "severity", "category"]
-
-    def __str__(self):
-        return self.summary

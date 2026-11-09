@@ -79,7 +79,6 @@
 </div>
 
 {% include "tracker/_pccf_flag.html" with fin=fin %}
-{% for i in issues %}<div class="banner">{{ i.summary }} <a href="/issues/">Data issues</a></div>{% endfor %}
 {% if not has_charter %}<div class="banner">No charter (PCCF 0) on file for this project. It was set up before charters were required.
   <a href="/projects/{{ project.pk }}/pccf/new/?charter=1">Add the charter</a></div>{% endif %}
 

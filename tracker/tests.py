@@ -398,20 +398,6 @@ class CharterTests(Base):
         self.assertContains(r, "Design end (2026-04-01) is before Design start (2026-05-01)")
         self.assertFalse(Project.objects.filter(io_number="3000003").exists())
 
-    def test_out_of_order_flag_clears_when_fixed(self):
-        from .models import DataIssue
-        from .services import flag_out_of_order_schedules
-        pc = self.p.pccfs.get()
-        pc.design_start, pc.design_end = dt.date(2025, 5, 1), dt.date(2025, 4, 1)
-        pc.save()
-        self.assertEqual(flag_out_of_order_schedules(), 1)
-        self.assertEqual(flag_out_of_order_schedules(), 0)   # not flagged twice
-        fields = {f: str(getattr(pc, f)) for f in self.MONEY}
-        fields.update(design_start="2025-03-01", design_end="2025-04-01",
-                      future=str(pc.total_budget - pc.q1 - pc.q2), q1=str(pc.q1), q2=str(pc.q2))
-        self.client.post(f"/projects/{self.p.pk}/pccf/{pc.pk}/", fields)
-        self.assertFalse(DataIssue.objects.filter(category="Schedule dates out of order", resolved=False).exists())
-
     def test_fee_is_calculated_not_typed(self):
         r = self.client.post("/projects/new/", self.data(design_cost="10,000.00", construction_cost="$90,000",
                                                          fee_percent="7.38", fee="999999", future="107,380.00"))
@@ -692,7 +678,7 @@ class CalendarTests(Base):
         self.assertNotContains(r, 'class="chip k-substantial')
 
     def test_overview_and_lists_render(self):
-        for url in ("/", "/projects/", "/projects/?show=all", "/pos/", "/change-orders/", "/issues/",
+        for url in ("/", "/projects/", "/projects/?show=all", "/pos/", "/change-orders/",
                     f"/projects/{self.p.pk}/", f"/projects/{self.p.pk}/?tab=budget",
                     f"/projects/{self.p.pk}/?tab=pos", f"/projects/{self.p.pk}/?tab=history"):
             self.assertEqual(self.client.get(url).status_code, 200, url)
@@ -1041,6 +1027,19 @@ class BudgetHealthTests(Base):
         ProjectStatus.objects.filter(project=self.p).update(stage=self.close)
         PurchaseOrder.objects.create(number=444, project=self.p, vendor=self.build, amount=D("10000"))
         self.assertEqual(self._health(), "over")
+
+
+class DataIssuesRemovedTests(Base):
+    def test_page_and_link_are_gone(self):
+        self.assertEqual(self.client.get("/issues/").status_code, 404)
+        self.assertNotContains(self.client.get("/"), "Data issues")
+
+    def test_import_fixes_still_apply_without_storing_anything(self):
+        from .management.commands._import_fixes import ImportIssue, resolve
+        issues = [ImportIssue("Same-day VOW entries", "low", "two entries"),
+                  ImportIssue("No PCCF", "medium", "left open on purpose", project=self.p)]
+        self.assertEqual(resolve(issues), (1, 1))
+        self.assertIn("Kept the last entry", issues[0].resolution_note)
 
 
 class MonthlyReportTests(Base):

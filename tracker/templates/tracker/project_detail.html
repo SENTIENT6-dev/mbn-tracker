@@ -296,6 +296,7 @@ Actual: {% if q.state == 'later' %}not started{% else %}{{ q.actual|money }} (in
   </table></div>
   {% else %}<p class="muted" style="margin:0">Nothing recorded yet. A month is recorded when its MPSR is saved.</p>{% endif %}
 </div>
+{% include "tracker/_changelog.html" with log=change_log title="PO, invoice and change order changes" %}
 <div class="grid g2">
   <div class="panel">
     <div class="panel-head"><h2>Update history</h2></div>

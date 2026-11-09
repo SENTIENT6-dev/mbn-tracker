@@ -41,6 +41,9 @@
   <div>
     <div class="panel">
       <h2>Add change order</h2>
+      {% if co_room.has_budget %}<p class="ink2" style="font-size:12.5px;margin:-4px 0 8px">Project {{ co_room.project }} can take
+        <strong class="{% if co_room.available <= 0 %}neg{% endif %}">{{ co_room.available|money:2 }}</strong> more in approved change orders
+        (budget excluding fee, less POs and approved change orders).</p>{% endif %}
       <form method="post" class="stack">{% csrf_token %}{{ co_form.as_p }}<button class="btn primary">Add change order</button></form>
     </div>
     <div class="tablewrap"><table>
@@ -54,4 +57,5 @@
     </table></div>
   </div>
 </div>
+{% include "tracker/_changelog.html" with log=change_log title="Change history" %}
 {% endblock %}

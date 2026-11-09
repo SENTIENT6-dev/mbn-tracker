@@ -102,8 +102,9 @@ class Command(BaseCommand):
         conn = pyodbc.connect(f"Driver={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={tmp};ReadOnly=1;")
         self.cur = conn.cursor()
         self.issues = []
+        from tracker.changelog import quiet
         try:
-            with transaction.atomic():
+            with transaction.atomic(), quiet():      # a full import isn't logged as thousands of edits
                 if reset:
                     self.wipe()
                 self.run()

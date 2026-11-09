@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from . import forms as F
 from . import snapshot
-from .models import MPSRReview, Project, ProjectStatus, StatusHistory, ValueOfWork
+from .models import MPSRReview, MPSRSnapshot, Project, ProjectStatus, StatusHistory, ValueOfWork
 from .textutil import current_fiscal_year, fiscal_label
 from .services import (PCCF_DATES, TENDER_DAYS, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, milestones,
                        pccf_flag_message, project_financials)
@@ -183,6 +183,15 @@ def mpsr_project(request, pk):
     done = set(MPSRReview.objects.filter(period=period).values_list("project_id", flat=True))
     q = f"?period={period:%Y-%m}"
 
+    # A past month that was already reported is locked, so what was reported stays on record. It can be
+    # unlocked on purpose (?unlock=1) to correct it; saving then replaces that month's record.
+    reported = MPSRSnapshot.objects.filter(project=project, period=period).first()
+    unlocked = request.GET.get("unlock") == "1" or request.POST.get("unlock") == "1"
+    locked = bool(reported) and period < timezone.localdate().replace(day=1) and not unlocked
+
+    if request.method == "POST" and locked:
+        messages.error(request, f"{period:%B %Y} is locked: it was already reported. Unlock it to make a correction.")
+        return redirect(f"/mpsr/{project.pk}/{q}")
     if request.method == "POST":
         if all(f.is_valid() for f in forms.values()):
             changed = _save(project, status, fin, forms, period)
@@ -211,6 +220,8 @@ def mpsr_project(request, pk):
         "prev_id": order[idx - 1] if idx else None,
         "next_id": order[idx + 1] if idx is not None and idx + 1 < len(order) else None,
         "reviewed": MPSRReview.objects.filter(project=project, period=period).first(),
+        "locked": locked, "unlocked": unlocked and bool(reported) and period < today.replace(day=1),
+        "reported": reported,
         "forecast_total": forecast_total, "forecast_variance": forecast_total - fin.budget_with_fee,
         "flagged": flagged_keys(fin), "current_fy": current_fiscal_year(today),
         "ap": approved_for_year(fin.pccf, status.fiscal_year),

@@ -91,6 +91,14 @@ a.tile:hover{text-decoration:none;border-color:var(--accent)}
 .more-menu .menu a:hover{background:var(--surface-2);text-decoration:none}
 .more-menu .menu a.danger{color:var(--crit-ink)}
 .flags{display:flex;flex-wrap:wrap;gap:4px}
+.log-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.log-when{width:78px;flex:none;color:var(--ink-2);font-size:12px}
+.log-when small{display:block;color:var(--muted)}
+.log-changes{margin:4px 0 0;padding-left:16px;font-size:12.5px}
+fieldset.lockable{border:0;padding:0;margin:0;min-width:0;display:contents}
+fieldset.lockable[disabled]{display:block;opacity:.72}
+.lock-flag{padding:11px 14px;border-radius:10px;margin-bottom:12px;background:var(--surface-2);border:1px solid var(--line);font-size:13px}
+.lock-flag.open{background:var(--warn-soft);border-color:var(--warn);color:var(--warn-ink)}
 .mpsr-links{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;font-weight:600}
 [id^="mpsr-"],#kpi-issues,#cash-flow{scroll-margin-top:16px}
 :target{animation:target-flash 1.6s ease-out}

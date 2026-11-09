@@ -1076,6 +1076,113 @@ class POBudgetLimitTests(Base):
         self.assertEqual(self.client.get("/pos/111/edit/").context["form"]["amount"].value(), D("105000"))
 
 
+class ChangeOrderBudgetTests(Base):
+    """$65,000 of budget left (see POBudgetLimitTests)."""
+
+    def test_new_approved_change_order_limited(self):
+        url = "/pos/222/"
+        r = self.client.post(url, {"co-description": "Extra", "co-value": "65000.01", "co-status": "approved"})
+        self.assertContains(r, "Not enough budget: this change order adds $65,000.01")
+        self.assertFalse(ChangeOrder.objects.exists())
+        self.client.post(url, {"co-description": "Asked", "co-value": "90000", "co-status": "requested"})
+        self.assertTrue(ChangeOrder.objects.filter(status="requested").exists())   # requests don't count yet
+        self.client.post(url, {"co-description": "Credit", "co-value": "-5000", "co-status": "approved"})
+        self.assertTrue(ChangeOrder.objects.filter(value=D("-5000")).exists())    # credits always fine
+
+    def test_approving_and_editing_checked(self):
+        co = ChangeOrder.objects.create(po=self.po2, description="Big", value=D("70000"), status="requested")
+        r = self.client.post(f"/change-orders/{co.pk}/approve/", follow=True)
+        self.assertContains(r, "Not approved. Not enough budget")
+        co.refresh_from_db()
+        self.assertEqual(co.status, "requested")
+        ok = ChangeOrder.objects.create(po=self.po2, description="Small", value=D("10000"), status="approved")
+        r = self.client.post(f"/change-orders/{ok.pk}/edit/", {"description": "Small", "value": "80000",
+                                                              "status": "approved"})
+        self.assertContains(r, "Not enough budget")                    # +70,000 but only 55,000 left
+        self.client.post(f"/change-orders/{ok.pk}/edit/", {"description": "Small", "value": "9000",
+                                                          "status": "approved"})
+        ok.refresh_from_db()
+        self.assertEqual(ok.value, D("9000"))                           # lowering is fine
+        self.client.post(f"/change-orders/{ok.pk}/process/")            # processing moves it into the PO: no check
+        self.assertEqual(PurchaseOrder.objects.get(number="222").amount, D("389000"))
+
+
+class ChangeLogTests(Base):
+    def setUp(self):
+        super().setUp()
+        from .models import ChangeLog
+        self.assertEqual(ChangeLog.objects.filter(action="added", kind="PO").count(), 2)   # setUp's two POs
+        ChangeLog.objects.all().delete()
+
+    def test_po_invoice_and_change_order_changes_logged(self):
+        from .models import ChangeLog
+        self.client.post("/pos/111/edit/", {"number": "111", "amount": "100000", "approved_date": "",
+                                            "project": self.p.pk, "vendor": self.arch.pk})
+        c = ChangeLog.objects.get(kind="PO")
+        self.assertEqual((c.action, c.label, c.changes), ("changed", "PO 111", {"PO value": ["105,000.00", "100,000.00"]}))
+        self.assertEqual(c.project_id, self.p.pk)
+        inv = Invoice.objects.create(po=self.po1, number="A1", amount=D("500"), date=dt.date(2026, 10, 1))
+        inv.delete()
+        actions = list(ChangeLog.objects.filter(kind="Invoice").values_list("action", flat=True))
+        self.assertEqual(sorted(actions), ["added", "deleted"])
+        r = self.client.get("/pos/111/")
+        self.assertContains(r, "Change history")
+        self.assertContains(r, "105,000.00")
+        self.assertContains(self.client.get(f"/projects/{self.p.pk}/?tab=history"), "PO, invoice and change order changes")
+
+    def test_bulk_loads_not_logged(self):
+        from .changelog import quiet
+        from .models import ChangeLog
+        with quiet():
+            PurchaseOrder.objects.create(number=999, project=self.p, vendor=self.arch, amount=D("1"))
+        self.assertFalse(ChangeLog.objects.exists())
+
+
+class MPSRLockTests(Base):
+    def setUp(self):
+        super().setUp()
+        from .models import MPSRSnapshot
+        MPSRSnapshot.objects.create(project=self.p, period=dt.date(2026, 10, 1), data={})
+
+    def test_reported_past_month_locked_until_unlocked(self):
+        r = self.client.get(f"/mpsr/{self.p.pk}/?period=2026-10")
+        self.assertTrue(r.context["locked"])
+        self.assertContains(r, "Unlock to correct it")
+        self.assertContains(r, '<fieldset class="lockable" disabled>')
+        r = self.client.post(f"/mpsr/{self.p.pk}/?period=2026-10", {"save": "1"}, follow=True)
+        self.assertContains(r, "October 2026 is locked")
+        r = self.client.get(f"/mpsr/{self.p.pk}/?period=2026-10&unlock=1")
+        self.assertFalse(r.context["locked"])
+        self.assertContains(r, "Correcting October 2026")
+        self.assertContains(r, 'name="unlock" value="1"')
+
+    def test_unreported_past_month_and_this_month_open(self):
+        self.assertFalse(self.client.get(f"/mpsr/{self.p.pk}/?period=2026-09").context["locked"])   # late MPSR
+        self.assertFalse(self.client.get(f"/mpsr/{self.p.pk}/").context["locked"])
+
+
+class TenderDeadlineWarningTests(Base):
+    def test_warns_15_days_before_tender_deadline(self):
+        from django.utils import timezone
+        today = timezone.localdate()
+        st = ProjectStatus.objects.get(project=self.p)
+
+        def warnings():
+            return [w.key for w in project_financials(Project.objects.get(pk=self.p.pk)).approaching]
+
+        st.actual_design_end = today - dt.timedelta(days=20)     # deadline in 10 days
+        st.save()
+        self.assertEqual(warnings(), ["tender"])
+        w = project_financials(Project.objects.get(pk=self.p.pk)).approaching[0]
+        self.assertIn("Go to tender deadline", w.text)
+        st.actual_design_end = today - dt.timedelta(days=10)     # deadline in 20 days: not yet
+        st.save()
+        self.assertEqual(warnings(), [])
+        st.actual_design_end, st.actual_tender = today - dt.timedelta(days=20), today
+        st.save()
+        self.assertEqual(warnings(), [])                          # already tendered
+
+
 class DataIssuesRemovedTests(Base):
     def test_page_and_link_are_gone(self):
         self.assertEqual(self.client.get("/issues/").status_code, 404)

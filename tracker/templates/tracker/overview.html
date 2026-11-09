@@ -17,7 +17,7 @@
   <a class="tile {% if kpi_issue_count %}alert{% else %}clear{% endif %}" href="/projects/?show=kpi_issue"><div class="k">KPI issues</div><div class="v">{{ kpi_issue_count }}</div>
     <div class="d">missed targets to review</div></a>
   <a class="tile {% if approaching %}info{% else %}clear{% endif %}" href="/projects/?show=approaching"><div class="k">Approaching targets</div><div class="v">{{ approaching|length }}</div>
-    <div class="d">approved date in the next 15 days</div></a>
+    <div class="d">target or tender deadline in 15 days</div></a>
   <a class="tile {% if overdue_count %}alert{% else %}clear{% endif %}" href="/calendar/"><div class="k">Overdue milestones</div><div class="v">{{ overdue_count }}</div>
     <div class="d">forecast passed, no actual date</div></a>
   <a class="tile {% if not open_cos %}clear{% endif %}" href="/change-orders/"><div class="k">Open change orders</div><div class="v">{{ open_cos }}</div>

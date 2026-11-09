@@ -11,7 +11,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from tracker.models import (PCCF, Building, BuildingRole, ChangeOrder, Company, CompanyType,
+from tracker.models import (PCCF, Building, BuildingRole, ChangeLog, ChangeOrder, Company, CompanyType,
                             HeritageStatus, Invoice, MPSRReview, Owner, Person, Project, ProjectStatus, Property,
                             PurchaseOrder, RoleType, StageGate, StatusHistory, ValueOfWork)
 from tracker.operations import set_owner
@@ -67,10 +67,15 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--reset", action="store_true", help="Delete everything first")
 
+    def handle(self, *args, **opts):
+        from tracker.changelog import quiet
+        with quiet():                                 # demo data isn't logged as edits
+            self.load(*args, **opts)
+
     @transaction.atomic
-    def handle(self, *args, reset=False, **opts):
+    def load(self, *args, reset=False, **opts):
         if reset:
-            for model in (Owner, StatusHistory, MPSRReview, ValueOfWork, ProjectStatus, ChangeOrder,
+            for model in (Owner, ChangeLog, StatusHistory, MPSRReview, ValueOfWork, ProjectStatus, ChangeOrder,
                           Invoice, PurchaseOrder, PCCF, Project, StageGate, BuildingRole, RoleType, Building,
                           HeritageStatus, Property, Person, Company, CompanyType):
                 model.objects.all().delete()

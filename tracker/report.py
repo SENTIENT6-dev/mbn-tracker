@@ -65,7 +65,8 @@ def issues_for(row, approaching):
         out.append(Issue(f"⚠ PCCF: {what}", f"{mpsr}#{'mpsr-cash' if r.is_cash else 'mpsr-dates'}", "warn", r.text))
     for w in approaching:
         when = "today" if w.days == 0 else f"in {w.days} day{'s' if w.days != 1 else ''}"
-        out.append(Issue(f"⏱ {w.label.replace(' performance', '')} {when}", f"{mpsr}#mpsr-dates", "blue", w.text))
+        where = "#mpsr-actuals" if w.key == "tender" else "#mpsr-dates"   # tender issued is an actual date
+        out.append(Issue(f"⏱ {w.label.replace(' performance', '')} {when}", f"{mpsr}{where}", "blue", w.text))
     if row.overdue:
         out.append(Issue(f"✗ {row.overdue} overdue", f"{mpsr}#mpsr-actuals", "overdue",
                          "Milestones whose forecast date passed with no actual date"))

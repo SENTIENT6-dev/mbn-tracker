@@ -12,10 +12,10 @@ from django.views.decorators.http import require_POST
 
 from . import forms as F
 from .textutil import current_fiscal_year, fiscal_label
-from .models import (PCCF, ChangeOrder, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
+from .models import (PCCF, ChangeLog, ChangeOrder, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
                      PurchaseOrder, StageGate, StatusHistory, ValueOfWork)
 from .operations import save_change_order
-from .services import (po_room, spend_by_quarter, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
+from .services import (co_budget_error, po_room, spend_by_quarter, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
                        schedule_health)
 
 ZERO = Decimal("0")
@@ -261,6 +261,7 @@ def project_detail(request, pk):
         "vows": project.vow_entries.all()[:12],
         # forecasts, dates, comments, risk and value of work are edited on the MPSR page only (one set of rules)
         "reported": _reported(project) if tab == "history" else [],
+        "change_log": project.change_log.all()[:100] if tab == "history" else [],
     }
     return render(request, "tracker/project_detail.html", ctx)
 
@@ -532,7 +533,7 @@ def po_list(request):
 def po_detail(request, number):
     po = get_object_or_404(PurchaseOrder.objects.select_related("project", "vendor"), number=number)
     inv_form = F.InvoiceForm(prefix="inv", po=po)
-    co_form = F.ChangeOrderForm(prefix="co")
+    co_form = F.ChangeOrderForm(prefix="co", po=po)
     if request.method == "POST":
         if "inv-number" in request.POST:
             inv_form = F.InvoiceForm(request.POST, prefix="inv", po=po)
@@ -543,7 +544,7 @@ def po_detail(request, number):
                 messages.success(request, f"Invoice {inv.number} for ${inv.amount:,.2f} added")
                 return redirect("po", number=number)
         elif "co-description" in request.POST:
-            co_form = F.ChangeOrderForm(request.POST, prefix="co")
+            co_form = F.ChangeOrderForm(request.POST, prefix="co", po=po)
             if co_form.is_valid():
                 co = co_form.save(commit=False)
                 co.po = po
@@ -554,7 +555,9 @@ def po_detail(request, number):
     from .views_manage import room_json
     return render(request, "tracker/po_detail.html", {
         "po": po, "row": row, "invoices": po.invoices.all(), "change_orders": po.change_orders.all(),
-        "inv_form": inv_form, "co_form": co_form, "rooms": room_json(invoice_room([po]))})
+        "inv_form": inv_form, "co_form": co_form, "rooms": room_json(invoice_room([po])),
+        "co_room": po_room([po.project])[po.project_id],
+        "change_log": ChangeLog.objects.filter(po_number=po.number)[:50]})
 
 
 @require_POST
@@ -567,8 +570,12 @@ def change_order_action(request, co_id, action):
             po = save_change_order(co, old_value=co.value, old_status=S.APPROVED)
             messages.success(request, f"PO {po.number} revised to ${po.amount:,.2f}")
         elif action == "approve" and co.status == S.REQUESTED:
-            co.status = S.APPROVED
-            co.save()
+            err = co_budget_error(co.po, ZERO, co.value)          # approving makes it count against the budget
+            if err:
+                messages.error(request, f"Not approved. {err}")
+            else:
+                co.status = S.APPROVED
+                co.save()
         elif action == "reject" and co.status in (S.REQUESTED, S.APPROVED):
             co.status = S.REJECTED
             co.save()

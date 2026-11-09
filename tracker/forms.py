@@ -349,6 +349,18 @@ class ChangeOrderEditForm(forms.ModelForm):
         help_texts = {"status": "Setting it to Processed adds the value to the PO; changing a processed one "
                                 "adjusts the PO by the difference."}
 
+    def clean(self):
+        """Raising what counts against the budget (a bigger value, or approving it) must fit the budget."""
+        from .services import co_budget_error, co_counted
+        data = super().clean()
+        if self.instance.pk and data.get("value") is not None:
+            old = ChangeOrder.objects.select_related("po__project").get(pk=self.instance.pk)
+            err = co_budget_error(old.po, co_counted(old.value, old.status),
+                                  co_counted(data["value"], data.get("status")))
+            if err:
+                self.add_error("value", err)
+        return data
+
 
 class VOWEntryForm(DateFieldsMixin, forms.ModelForm):
     class Meta:
@@ -544,10 +556,21 @@ class ChangeOrderForm(forms.ModelForm):
         model = ChangeOrder
         fields = ["description", "value", "status", "folder_link", "comment"]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, po=None, **kwargs):
+        self.po = po
         super().__init__(*args, **kwargs)
         self.fields["status"].choices = [c for c in ChangeOrder.State.choices
                                          if c[0] != ChangeOrder.State.PROCESSED]
+
+    def clean(self):
+        """An approved change order can't take the project past its budget (excluding the fee)."""
+        from .services import co_budget_error, co_counted
+        data = super().clean()
+        if self.po is not None and data.get("value") is not None:
+            err = co_budget_error(self.po, Decimal("0"), co_counted(data["value"], data.get("status")))
+            if err:
+                self.add_error("value", err)
+        return data
 
 
 class CashFlowForm(FiscalYearMixin, forms.ModelForm):

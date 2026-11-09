@@ -1,0 +1,18 @@
+{# Change log entries. Needs: log (ChangeLog list), title #}
+<div class="panel">
+  <div class="panel-head"><h2>{{ title }}</h2><span class="spacer"></span><span class="muted" style="font-size:12px">every add, edit and delete</span></div>
+  {% for c in log %}
+    <div class="log-row">
+      <div class="log-when">{{ c.when|date:"Y-m-d" }}<small>{{ c.when|date:"H:i" }}</small></div>
+      <div style="min-width:0;flex:1">
+        <span class="pill {% if c.action == 'deleted' %}crit{% elif c.action == 'added' %}ok{% else %}blue{% endif %}">{{ c.get_action_display }}</span>
+        <strong>{{ c.label }}</strong>
+        {% if c.changes %}<ul class="log-changes">{% for field, v in c.changes.items %}
+          <li><span class="ink2">{{ field }}:</span>
+            {% if c.action == 'changed' %}<span class="muted" style="text-decoration:line-through">{{ v.0|default:"–" }}</span> → <strong>{{ v.1|default:"–" }}</strong>
+            {% elif c.action == 'added' %}{{ v.1 }}{% else %}{{ v.0 }}{% endif %}</li>
+        {% endfor %}</ul>{% endif %}
+      </div>
+    </div>
+  {% empty %}<p class="muted" style="margin:0">No changes recorded yet. Changes are recorded from now on.</p>{% endfor %}
+</div>

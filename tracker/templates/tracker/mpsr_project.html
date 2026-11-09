@@ -20,6 +20,13 @@
   </div>
 </div>
 
+{% if locked %}
+<div class="lock-flag" role="status">🔒 <strong>{{ period|date:"F Y" }} was reported on {{ reported.saved_at|date:"Y-m-d" }}</strong> and is locked, so what was
+  reported stays on record. <a href="/mpsr/{{ project.pk }}/{{ q }}&unlock=1">Unlock to correct it</a></div>
+{% elif unlocked %}
+<div class="lock-flag open" role="status">🔓 <strong>Correcting {{ period|date:"F Y" }}</strong>: saving replaces what was reported that month
+  (and updates the current figures). <a href="/mpsr/{{ project.pk }}/{{ q }}">Lock again without saving</a></div>
+{% endif %}
 {% include "tracker/_pccf_flag.html" with fin=fin %}
 
 <div class="grid mpsr-grid">
@@ -105,6 +112,8 @@
 
   {# ---------------- right: what the PM updates #}
   <form method="post" class="mpsr-form stack">{% csrf_token %}
+    {% if unlocked %}<input type="hidden" name="unlock" value="1">{% endif %}
+    <fieldset class="lockable" {% if locked %}disabled{% endif %}>
     <div class="panel" id="mpsr-comment">
       <div class="panel-head"><h2>1 · Status comment</h2></div>
       <p class="ink2" style="margin:-6px 0 8px;font-size:12.5px">What happened this month and what's next. Starts with the current comment; edit or replace it.</p>
@@ -176,11 +185,18 @@
       <p class="muted" style="font-size:12px;margin:4px 0 0">A new value-of-work entry is only recorded when these numbers change.</p>
     </div>
 
+    </fieldset>
     <div class="mpsr-actions">
+      {% if locked %}
+      <span class="ink2" style="font-size:13px">🔒 Read-only: {{ period|date:"F Y" }} was reported.</span>
+      <a class="btn" href="/mpsr/{{ project.pk }}/{{ q }}&unlock=1">Unlock to correct it</a>
+      {% if next_id %}<a class="btn" href="/mpsr/{{ next_id }}/{{ q }}">Next project →</a>{% endif %}
+      {% else %}
       <button class="btn primary" name="save_next" value="1">Save &amp; next project →</button>
       <button class="btn" name="save" value="1">Save</button>
       {% if next_id %}<a class="btn" href="/mpsr/{{ next_id }}/{{ q }}">Skip</a>{% endif %}
-      <span class="muted" style="font-size:12px">Saving marks this project done for {{ period|date:"F" }}, even with no changes.</span>
+      <span class="muted" style="font-size:12px">{% if unlocked %}Saving replaces what was reported for {{ period|date:"F Y" }}.{% else %}Saving marks this project done for {{ period|date:"F" }}, even with no changes.{% endif %}</span>
+      {% endif %}
     </div>
   </form>
 </div>

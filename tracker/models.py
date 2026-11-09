@@ -473,6 +473,27 @@ class MPSRReview(models.Model):
         constraints = [models.UniqueConstraint(fields=["project", "period"], name="one_review_per_month")]
 
 
+class ChangeLog(models.Model):
+    """Who-changed-what record for purchase orders, invoices and change orders (see tracker/changelog.py)."""
+
+    class Action(models.TextChoices):
+        ADDED = "added", "Added"
+        CHANGED = "changed", "Changed"
+        DELETED = "deleted", "Deleted"
+
+    when = models.DateTimeField(auto_now_add=True)
+    kind = models.CharField(max_length=20)           # "PO", "Invoice", "Change order"
+    label = models.CharField(max_length=255)         # e.g. "PO ION00123" / "Invoice 4567 on PO ION00123"
+    action = models.CharField(max_length=10, choices=Action.choices)
+    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="change_log")
+    project_number = models.CharField(max_length=50, blank=True)   # kept even if the project is deleted
+    po_number = models.CharField(max_length=30, blank=True)
+    changes = models.JSONField(default=dict, blank=True)          # {field label: [old, new]}
+
+    class Meta:
+        ordering = ["-when", "-id"]
+
+
 class MPSRSnapshot(models.Model):
     """What was reported for a project in a month: the figures as they stood when that month's MPSR was saved.
     Saving the MPSR again in the same month replaces it. See tracker/snapshot.py for the fields."""

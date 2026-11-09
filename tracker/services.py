@@ -237,21 +237,28 @@ class TargetWarning:
     @property
     def text(self):
         when = "today" if self.days == 0 else f"in {self.days} day{'s' if self.days != 1 else ''}"
+        if self.key == "tender":
+            return f"Go to tender deadline {self.target} is {when} (30 days after design end)"
         fc = f" · forecast {self.forecast}" if self.forecast and self.forecast != self.target else ""
         return f"{self.label} target {self.target} is {when}{fc}"
 
 
-def approaching_targets(project, pccf, status, today=None):
-    if pccf is None or not _reporting(project):
+def approaching_targets(project, pccf, status, today=None, in_construction=False):
+    """Approved target dates (and the 30-day tender deadline) coming up within APPROACHING_DAYS, not yet met."""
+    if not _reporting(project):
         return []
     today = today or timezone.localdate()
     out = []
-    for field, label in PCCF_DATES:
+    for field, label in PCCF_DATES if pccf else []:
         target = getattr(pccf, field)
         done = getattr(status, f"actual_{field}", None) if status else None
         if target and not done and 0 <= (target - today).days <= APPROACHING_DAYS:
             out.append(TargetWarning(field, label, target, getattr(status, field, None) if status else None,
                                      (target - today).days))
+    due = tender_deadline(status)
+    tendered = status is not None and (status.actual_tender or status.actual_construction_award or in_construction)
+    if due and not tendered and 0 <= (due - today).days <= APPROACHING_DAYS:
+        out.append(TargetWarning("tender", "Go to tender", due, None, (due - today).days))
     return out
 
 
@@ -285,6 +292,7 @@ class Financials:
     invoiced: Decimal = ZERO
     kpi_failures: list = field(default_factory=list)
     closing: bool = False   # closing out: stage Closeout or later, phase Financial Close, or completed / closed
+    in_construction: bool = False   # stage Construction or later, or phase Construction / Financial Close
 
     @property
     def pccf_reasons(self):
@@ -301,7 +309,8 @@ class Financials:
     @property
     def approaching(self):
         if not hasattr(self, "_approaching"):
-            self._approaching = approaching_targets(self.project, self.pccf, self.status)
+            self._approaching = approaching_targets(self.project, self.pccf, self.status,
+                                                    in_construction=self.in_construction)
         return self._approaching
 
     @property
@@ -473,6 +482,7 @@ def financials(projects):
     for k in KPIFailure.objects.filter(project_id__in=ids):
         kpis.setdefault(k.project_id, []).append(k)
     is_closing = closing_check()
+    is_building = construction_check()
 
     pos =PurchaseOrder.objects.filter(project_id__in=ids)
     commit = _sum_by(pos, "project_id", "amount")
@@ -484,6 +494,7 @@ def financials(projects):
 
     return [Financials(project=p, pccf=latest.get(p.id), vow=vows.get(p.id), status=statuses.get(p.id),
                        kpi_failures=kpis.get(p.id, []), closing=is_closing(p, statuses.get(p.id)),
+                       in_construction=is_building(p, statuses.get(p.id)),
                        commitments=commit.get(p.id, ZERO), consultant_commitments=consult.get(p.id, ZERO),
                        contractor_commitments=contract.get(p.id, ZERO), pending=pending.get(p.id, ZERO),
                        invoiced=invoiced.get(p.id, ZERO))
@@ -578,6 +589,26 @@ def po_room(projects, exclude_po=None):
             "committed": committed, "pending": f.pending, "available": f.budget - committed - f.pending,
         }
     return out
+
+
+def co_counted(value, status):
+    """How much of a change order counts against the budget: approved (pending) and processed ones do."""
+    return value if status in (ChangeOrder.State.APPROVED, ChangeOrder.State.PROCESSED) else ZERO
+
+
+def co_budget_error(po, old_counted, new_counted):
+    """Message if a change order would take the project past its budget (excluding fee), else None.
+    Only an increase is checked: credits, lowering a value and rejecting are always allowed."""
+    increase = new_counted - old_counted
+    if increase <= 0:
+        return None
+    room = po_room([po.project])[po.project_id]
+    if not room["has_budget"] or increase <= room["available"] + Decimal("0.004"):
+        return None
+    return (f"Not enough budget: this change order adds ${increase:,.2f} but project {room['project']} can only "
+            f"take ${room['available']:,.2f} more (budget ${room['budget']:,.2f} excluding fee, less "
+            f"${room['committed']:,.2f} on POs and ${room['pending']:,.2f} in approved change orders). "
+            f"Get a revised PCCF approved first.")
 
 
 def po_room_message(room, amount):

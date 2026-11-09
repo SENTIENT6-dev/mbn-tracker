@@ -436,6 +436,10 @@ class KPIFailure(models.Model):
     def __str__(self):
         return f"{self.project.io_number} {self.get_milestone_display()} KPI failure (target {self.target})"
 
+    @property
+    def short(self):
+        return {"design_end": "Design end", "substantial": "Substantial"}.get(self.milestone, self.milestone)
+
 
 class StatusHistory(models.Model):
     """Audit trail of every MPSR update (replaces the four *_History tables)."""

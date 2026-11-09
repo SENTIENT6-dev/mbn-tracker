@@ -23,6 +23,7 @@ CONSULTANT, CONTRACTOR = "Consultant", "Contractor"
 
 CASH_TOLERANCE = Decimal("1")      # cents of rounding don't need a PCCF
 PCCF_DATES = [("design_end", "Design end"), ("substantial", "Substantial performance")]   # the KPI target dates
+SHORT_LABELS = {"design_end": "Design end", "substantial": "Substantial"}                  # for tags
 APPROACHING_DAYS = 15              # warn this many days before an approved target date
 
 
@@ -186,6 +187,10 @@ class KPIIssue:
     target: object
     actual: object
     forecast: object
+
+    @property
+    def short(self):
+        return SHORT_LABELS.get(self.key, self.label)
 
     @property
     def text(self):

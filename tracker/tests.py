@@ -1377,7 +1377,21 @@ class KPIAndApproachingTests(Base):
         self.assertFalse(self._fin().pccf_required)
         r = self.client.get("/")
         self.assertEqual(r.context["kpi_issue_count"], 1)
-        self.assertContains(self.client.get("/projects/?show=kpi_issue"), "⚑ KPI issue")
+        self.assertContains(self.client.get("/projects/?show=kpi_issue"), "⚑ Substantial")
+
+    def test_failure_replaces_its_issue_tag(self):
+        from .models import KPIFailure
+        past = self.today - dt.timedelta(days=10)
+        PCCF.objects.filter(project=self.p).update(substantial=past, design_end=past - dt.timedelta(days=200))
+        ProjectStatus.objects.filter(project=self.p).update(substantial=past, design_end=past)
+        r = self.client.get("/projects/")
+        self.assertContains(r, "⚑ Substantial")
+        self.assertContains(r, "⚑ Design end")
+        KPIFailure.objects.create(project=self.p, milestone="substantial", target=past, note="Supply delay")
+        r = self.client.get("/projects/")
+        self.assertNotContains(r, "⚑ Substantial")                      # the failure replaces its issue
+        self.assertContains(r, "✗ Substantial failed")
+        self.assertContains(r, "⚑ Design end")                         # a different target, still an issue
 
     def test_design_end_cleared_by_tender_or_award_within_30_days(self):
         from .services import milestones

@@ -119,8 +119,8 @@
       <td class="n {% if row.fin.remaining_budget|neg %}neg{% endif %}">{{ row.fin.remaining_budget|money }}</td>
       <td>{% include "tracker/_health.html" with f=row.fin %}
         {% if row.fin.pccf_required %}<span class="pill warn">PCCF</span>{% endif %}
-        {% if row.fin.kpi_issues %}<span class="pill over">KPI issue{{ row.fin.kpi_issues|length|pluralize }}</span>{% endif %}
-        {% if row.fin.kpi_failures %}<span class="pill crit">KPI failure{{ row.fin.kpi_failures|length|pluralize }}</span>{% endif %}
+        {% for i in row.fin.kpi_issues %}<span class="pill over" title="KPI issue: {{ i.text }}">⚑ {{ i.short }}</span>{% endfor %}
+        {% for k in row.fin.kpi_failures %}<span class="pill crit">✗ {{ k.short }} failed</span>{% endfor %}
         {% if row.underspent %}<span class="pill warn">Under-spent</span>{% endif %}</td>
       <td class="nowrap">{% if row.mpsr_done %}<span class="pill ok">✓ Done</span>{% else %}<span class="pill none">Not done</span>{% endif %}</td></tr>
   {% endfor %}</tbody>

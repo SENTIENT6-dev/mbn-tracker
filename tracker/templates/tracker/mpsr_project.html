@@ -119,10 +119,10 @@
                 data-pccf-fy="{{ fin.pccf.fiscal_year|default_if_none:'' }}" data-pccf-year="{{ fin.pccf.current_year_cash_flow }}"
                 data-pccf-next="{{ fin.pccf.next_year }}"
                 title="This fiscal year's forecast (Q1–Q4) vs what PCCF {{ fin.pccf.submission }} approved for it. A difference needs a PCCF.">
-            This FY {{ status.current_year_forecast|money }} vs approved {% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</span>
+            This FY {{ status.current_year_forecast|money:2 }} vs approved {% if approved_year != None %}{{ approved_year|money:2 }}{% else %}–{% endif %}</span>
           {% endif %}
           <span class="pill {% if forecast_variance|abs <= 1 %}ok{% else %}warn{% endif %}" id="live-total" data-budget="{{ fin.budget_with_fee }}" title="Forecast total vs budget incl. fee">
-            Forecast {{ forecast_total|money }} vs budget {{ fin.budget_with_fee|money }}{% if forecast_variance|abs > 1 %} · {% if not forecast_variance|neg %}+{% endif %}{{ forecast_variance|money }}{% endif %}</span>
+            Forecast {{ forecast_total|money:2 }} vs budget {{ fin.budget_with_fee|money:2 }}{% if forecast_variance|abs > 1 %} · {% if not forecast_variance|neg %}+{% endif %}{{ forecast_variance|money:2 }}{% endif %}</span>
         </div></div>
       <div class="mpsr-row">
         <p>{{ f.cash.fiscal_year.label_tag }}{{ f.cash.fiscal_year }}{{ f.cash.fiscal_year.errors }}</p>
@@ -165,8 +165,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const totalPill = document.getElementById('live-total');
   const fyPill = document.getElementById('live-fy');
   const fyCell = document.getElementById('live-fy-cell');
-  // like the money filter: whole dollars, negatives in brackets
-  const $ = n => { const r = Math.round(n); const t = '$' + Math.abs(r).toLocaleString('en-CA'); return r < 0 ? `(${t})` : t; };
+  // like the money filter to the cent: $1,234.50, negatives in brackets
+  const $ = n => {
+    const r = Math.round(n * 100) / 100;
+    const t = '$' + Math.abs(r).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    return r < 0 ? `(${t})` : t;
+  };
+  const cellFmt = n => { const r = Math.round(n); const t = '$' + Math.abs(r).toLocaleString('en-CA'); return r < 0 ? `(${t})` : t; };
   // what the PCCF approved for the chosen fiscal year (same rule as the server's PCCF check)
   const approvedFor = fy => {
     const d = fyPill.dataset, pfy = parseInt(d.pccfFy, 10);
@@ -181,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
     totalPill.textContent = `Forecast ${$(total)} vs budget ${$(budget)}` +
       (Math.abs(diff) > 1 ? ` · ${diff > 0 ? '+' : ''}${$(diff)}` : '');
     totalPill.className = 'pill ' + (Math.abs(diff) <= 1 ? 'ok' : 'warn');
-    if (fyCell) fyCell.innerHTML = `<strong>${$(thisYear)}</strong>`;
+    if (fyCell) fyCell.innerHTML = `<strong>${cellFmt(thisYear)}</strong>`;   // table stays in whole dollars
     if (fyPill) {
       const approved = approvedFor(parseInt(fyBox && fyBox.value, 10) || null);
       const off = approved !== null && Math.abs(thisYear - approved) >= 1;

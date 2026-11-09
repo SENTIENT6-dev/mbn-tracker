@@ -563,6 +563,30 @@ def invoice_room(pos, exclude_invoice=None):
     return out
 
 
+def po_room(projects, exclude_po=None):
+    """Largest PO value each project's budget still allows: budget excluding the fee - existing POs - approved
+    change orders not yet processed into their PO. `exclude_po` leaves one PO out (when editing it).
+    Returns {project.pk: {...}}; has_budget is False when the project has no PCCF (then no limit applies)."""
+    out = {}
+    for f in financials(projects):
+        committed = f.commitments
+        if exclude_po is not None and exclude_po.project_id == f.project.pk:
+            committed -= exclude_po.amount
+        out[f.project.pk] = {
+            "project": f.project.io_number, "has_budget": f.pccf is not None,
+            "pccf": f.pccf.submission if f.pccf else None, "budget": f.budget, "fee": f.budget_with_fee - f.budget,
+            "committed": committed, "pending": f.pending, "available": f.budget - committed - f.pending,
+        }
+    return out
+
+
+def po_room_message(room, amount):
+    return (f"Not enough budget: this PO is ${amount:,.2f} but project {room['project']} can only take "
+            f"${room['available']:,.2f} more (budget ${room['budget']:,.2f} excluding fee, less "
+            f"${room['committed']:,.2f} already on POs and ${room['pending']:,.2f} in approved change orders). "
+            f"Get a revised PCCF approved first.")
+
+
 def room_message(room, amount):
     """Explanation shown when an invoice is larger than what's available."""
     if room["limit"] == "project":

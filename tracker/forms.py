@@ -302,6 +302,22 @@ class PurchaseOrderForm(DateFieldsMixin, forms.ModelForm):
         if self.instance.pk:
             self.fields["project"].help_text = "Moving a PO moves its invoices and change orders with it."
 
+    def clean(self):
+        """A PO can't be larger than what the project's budget (excluding the fee) has left."""
+        from .services import po_room, po_room_message
+        data = super().clean()
+        project, amount = data.get("project"), data.get("amount")
+        if project is None or amount is None:
+            return data
+        old = PurchaseOrder.objects.get(pk=self.instance.pk) if self.instance.pk else None
+        # editing without raising the value on the same project is always fine (even on a project already over)
+        if old and old.project_id == project.pk and amount <= old.amount:
+            return data
+        room = po_room([project], exclude_po=old)[project.pk]
+        if room["has_budget"] and amount > room["available"] + Decimal("0.004"):
+            self.add_error("amount", po_room_message(room, amount))
+        return data
+
 
 class InvoiceEditForm(DateFieldsMixin, forms.ModelForm):
     class Meta:

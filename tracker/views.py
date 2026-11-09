@@ -15,7 +15,7 @@ from .textutil import current_fiscal_year, fiscal_label
 from .models import (PCCF, ChangeOrder, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
                      PurchaseOrder, StageGate, StatusHistory, ValueOfWork)
 from .operations import save_change_order
-from .services import (spend_by_quarter, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
+from .services import (po_room, spend_by_quarter, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
                        schedule_health)
 
 ZERO = Decimal("0")
@@ -586,8 +586,13 @@ def po_form(request, number=None):
         return redirect("po", number=po.number)
     back = f"/pos/{number}/" if po else (f"/projects/{request.GET['project']}/?tab=pos"
                                           if request.GET.get("project", "").isdigit() else "/pos/")
+    # how much each project's budget still allows, for the live "maximum PO value" box
+    rooms = {pk: {k: float(v) if isinstance(v, Decimal) else v for k, v in r.items()}
+             for pk, r in po_room(Project.objects.all(), exclude_po=po).items()}
     return render(request, "tracker/po_form.html", {"form": form, "title": f"Edit PO {number}" if po else "New PO",
-                                                    "back": back})
+                                                    "back": back, "rooms": rooms,
+                                                    "old": {"project": po.project_id, "amount": float(po.amount)}
+                                                    if po else None})
 
 
 def pending_changes(request):

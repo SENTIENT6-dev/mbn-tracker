@@ -1029,6 +1029,48 @@ class BudgetHealthTests(Base):
         self.assertEqual(self._health(), "over")
 
 
+class POBudgetLimitTests(Base):
+    """Base project: budget $550,000 excluding the $55,000 fee; POs 111 ($105,000) + 222 ($380,000)."""
+
+    def _new(self, amount, project=None, number="ION00999"):
+        return self.client.post("/pos/new/", {"number": number, "amount": amount, "approved_date": "2026-11-01",
+                                              "project": (project or self.p).pk, "vendor": self.build.pk})
+
+    def test_maximum_and_block(self):
+        from .services import po_room
+        room = po_room([self.p])[self.p.pk]
+        self.assertEqual((room["budget"], room["committed"], room["available"]), (D("550000"), D("485000"), D("65000")))
+        r = self._new("65000.01")
+        self.assertContains(r, "Not enough budget: this PO is $65,000.01 but project 1000001 can only take $65,000.00")
+        self.assertFalse(PurchaseOrder.objects.filter(number="ION00999").exists())
+        self._new("65000")
+        self.assertTrue(PurchaseOrder.objects.filter(number="ION00999").exists())   # exactly the maximum is fine
+
+    def test_approved_change_orders_count(self):
+        ChangeOrder.objects.create(po=self.po2, description="extra", value=D("5000"), status="approved")
+        self._new("62000")
+        self.assertFalse(PurchaseOrder.objects.filter(number="ION00999").exists())   # only 60,000 left
+
+    def test_editing_a_po(self):
+        data = {"number": "222", "amount": "445000.01", "approved_date": "", "project": self.p.pk,
+                "vendor": self.build.pk}
+        r = self.client.post("/pos/222/edit/", data)
+        self.assertContains(r, "Not enough budget")                    # 550,000 - 105,000 = 445,000 max
+        self.client.post("/pos/222/edit/", {**data, "amount": "445000"})
+        self.assertEqual(PurchaseOrder.objects.get(number="222").amount, D("445000"))
+        PurchaseOrder.objects.create(number=333, project=self.p, vendor=self.arch, amount=D("50000"))   # now over
+        self.client.post("/pos/222/edit/", {**data, "amount": "440000"})   # lowering is always allowed
+        self.assertEqual(PurchaseOrder.objects.get(number="222").amount, D("440000"))
+
+    def test_no_pccf_no_limit_and_form_shows_box(self):
+        other = Project.objects.create(io_number="1000002", title="Paint")
+        self._new("9999999", project=other)
+        self.assertTrue(PurchaseOrder.objects.filter(number="ION00999").exists())
+        r = self.client.get(f"/pos/new/?project={self.p.pk}")
+        self.assertEqual(r.context["rooms"][self.p.pk]["available"], 65000.0)
+        self.assertContains(r, 'id="po-room"')
+
+
 class DataIssuesRemovedTests(Base):
     def test_page_and_link_are_gone(self):
         self.assertEqual(self.client.get("/issues/").status_code, 404)

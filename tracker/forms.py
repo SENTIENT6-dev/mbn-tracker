@@ -301,6 +301,9 @@ class PurchaseOrderForm(DateFieldsMixin, forms.ModelForm):
             lambda p: f"{p.io_number} · {p.title}{'' if p.status in (1, 2) else ' (' + p.get_status_display() + ')'}"
         if self.instance.pk:
             self.fields["project"].help_text = "Moving a PO moves its invoices and change orders with it."
+        else:
+            self.initial["amount"] = None   # start empty, not "0.00" (typing would add to it)
+        self.fields["amount"].required = True
 
     def clean(self):
         """A PO can't be larger than what the project's budget (excluding the fee) has left."""

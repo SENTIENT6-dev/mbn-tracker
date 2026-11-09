@@ -1069,6 +1069,11 @@ class POBudgetLimitTests(Base):
         r = self.client.get(f"/pos/new/?project={self.p.pk}")
         self.assertEqual(r.context["rooms"][self.p.pk]["available"], 65000.0)
         self.assertContains(r, 'id="po-room"')
+        self.assertIsNone(r.context["form"]["amount"].value())         # new PO: value starts empty
+        r = self.client.post("/pos/new/", {"number": "ION00888", "amount": "", "project": self.p.pk,
+                                           "vendor": self.build.pk})
+        self.assertContains(r, "This field is required")
+        self.assertEqual(self.client.get("/pos/111/edit/").context["form"]["amount"].value(), D("105000"))
 
 
 class DataIssuesRemovedTests(Base):

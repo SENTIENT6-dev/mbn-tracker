@@ -9,7 +9,6 @@ extend-exclude = ["tracker/migrations", "staticfiles", "backups"]
 # B bugbear (likely bugs), UP pyupgrade, DJ Django checks, C4 comprehensions, SIM simplifications
 select = ["E", "W", "F", "I", "B", "UP", "DJ", "C4", "SIM"]
 ignore = [
-    "DJ001",   # null=True on CharField: the Access import relies on it in a few places
     "SIM108",  # ternary instead of if/else: not always clearer
     "UP038",   # isinstance(x, A | B): deprecated by Ruff itself; tuples are fine
 ]

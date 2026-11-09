@@ -475,13 +475,12 @@ class OwnerTests(TestCase):
         self.assertRedirects(r, "/setup/", fetch_redirect_response=False)
         r = self.client.post("/setup/", {"me-first_name": "Jo", "me-last_name": "Smith",
                                          "me-email": "jo.smith@bgis.com", "me-position": "Project Manager"})
-        self.assertRedirects(r, "/setup/?step=import", fetch_redirect_response=False)
+        self.assertRedirects(r, "/", fetch_redirect_response=False)       # straight into the tracker
         from .models import Owner
         me = Owner.current().person
         self.assertEqual((str(me), me.company.name), ("Jo Smith", "BGIS"))
         self.assertEqual(self.client.get("/").status_code, 200)
-        r = self.client.post("/setup/?step=import", {"skip": "1"})
-        self.assertRedirects(r, "/", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get("/setup/"), "/settings/", fetch_redirect_response=False)
 
     def test_projects_belong_to_the_owner(self):
         from .operations import set_owner
@@ -522,14 +521,13 @@ class OwnerTests(TestCase):
         p = Person.objects.get(last_name="Lee")
         self.assertEqual((p.email, p.phone), ("ana@bgis.com", "416"))   # blank boxes didn't erase them
 
-    def test_settings_import_needs_existing_file_and_confirmation(self):
+    def test_no_access_import_anywhere(self):
+        from django.core.management import get_commands
+
         from .operations import set_owner
         set_owner("Jo", "Smith")
-        Project.objects.create(io_number="9", title="x")
-        r = self.client.post("/settings/", {"run_import": "1", "imp-source": r"C:\nope\MBN.accdb",
-                                            "imp-only_mine": "on"})
-        self.assertContains(r, "That file doesn")
-        self.assertContains(r, "Type REPLACE")
+        self.assertNotContains(self.client.get("/settings/"), "Access")
+        self.assertFalse({"import_access", "reconcile_access"} & set(get_commands()))
 
 
 class MPSRTests(Base):
@@ -630,20 +628,6 @@ class BudgetBarTests(Base):
         self.assertAlmostEqual(f.bar_committed + f.bar_over, 100, places=5)
         r = self.client.get("/projects/")
         self.assertContains(r, "over by $100,000")
-
-
-class CombineNotesTests(TestCase):
-    def test_drops_no_change_and_repeated_sentences(self):
-        from .textutil import combine_notes
-        scope = "No change to scope. This change is to request funding. The load bank moves outside."
-        budget = "This change is to request funding. The load bank moves outside. Cash flow adjusted accordingly."
-        out = combine_notes([("Scope", scope), ("Methodology", "No change"), ("Milestones", " no change. "),
-                             ("Budget", budget)])
-        self.assertEqual(out, f"Scope: {scope}\n\nBudget: Cash flow adjusted accordingly.")
-
-    def test_single_part_has_no_label(self):
-        from .textutil import combine_notes
-        self.assertEqual(combine_notes([("Scope", "Only this."), ("Budget", "Only this.")]), "Only this.")
 
 
 class CalendarTests(Base):
@@ -1214,13 +1198,6 @@ class DataIssuesRemovedTests(Base):
     def test_page_and_link_are_gone(self):
         self.assertEqual(self.client.get("/issues/").status_code, 404)
         self.assertNotContains(self.client.get("/"), "Data issues")
-
-    def test_import_fixes_still_apply_without_storing_anything(self):
-        from .management.commands._import_fixes import ImportIssue, resolve
-        issues = [ImportIssue("Same-day VOW entries", "low", "two entries"),
-                  ImportIssue("No PCCF", "medium", "left open on purpose", project=self.p)]
-        self.assertEqual(resolve(issues), (1, 1))
-        self.assertIn("Kept the last entry", issues[0].resolution_note)
 
 
 class MonthlyReportTests(Base):

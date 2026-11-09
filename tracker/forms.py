@@ -405,33 +405,6 @@ class OwnerForm(forms.Form):
     position = forms.CharField(max_length=255, required=False, initial="Project Manager", label="Title")
 
 
-class AccessImportForm(forms.Form):
-    source = forms.CharField(label="Access file (MBN.accdb)", max_length=500,
-                             widget=forms.TextInput(attrs={"placeholder": r"C:\Users\you\Downloads\MBN.accdb"}),
-                             help_text="Full path to the file on this computer. It's only read, never changed.")
-    only_mine = forms.BooleanField(required=False, initial=True, label="Only projects where I'm the project manager")
-    confirm = forms.CharField(required=False, label="Type REPLACE to confirm",
-                              help_text="Everything currently in this tracker is replaced by the Access data.")
-
-    def __init__(self, *args, has_data=False, **kwargs):
-        self.has_data = has_data
-        super().__init__(*args, **kwargs)
-        if not has_data:
-            del self.fields["confirm"]
-
-    def clean_source(self):
-        from pathlib import Path
-        p = self.cleaned_data["source"].strip().strip('"')
-        if not Path(p).is_file():
-            raise forms.ValidationError("That file doesn't exist. Check the path (copy it from File Explorer).")
-        return p
-
-    def clean_confirm(self):
-        if self.has_data and self.cleaned_data.get("confirm", "").strip() != "REPLACE":
-            raise forms.ValidationError("Type REPLACE to confirm that the current data will be replaced.")
-        return "REPLACE"
-
-
 class PersonForm(forms.ModelForm):
     class Meta:
         model = Person

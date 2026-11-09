@@ -6,7 +6,7 @@ Replacement for `MBN.accdb`: projects, PCCF budgets, POs, invoices, change order
 as a local web app (Python + Django + SQLite). Data lives in `db.sqlite3` in this folder.
 
 **Each project manager has their own tracker.** The first time it opens, it asks who you are (you become
-the PM on every project in it), then offers to import your projects from the Access database.
+the PM on every project in it); then you add your projects with **+ New project**.
 
 ## Start it
 Double-click `start.bat`. It opens http://127.0.0.1:8000/ in your browser.
@@ -36,15 +36,11 @@ Settings for any server (environment variables):
 ## Giving a copy to another PM
 1. Copy this folder **without** `db.sqlite3`, `db.backup-*.sqlite3` and `.venv`.
 2. On their PC (Python 3.11 installed): double-click `install.bat` once.
-3. Double-click `start.bat`. The tracker asks for their name and details, then for the Access file.
-   With *Only projects where I'm the project manager* ticked, a shared team Access file gives them just their
-   projects. (Records of projects that were deleted in Access have no PM, so they're left out in that mode.)
+3. Double-click `start.bat`. The tracker asks for their name and details, then opens empty, ready for their
+   projects.
 
-Later reloads from a newer Access file are under **Settings** (click your name, bottom left). Your details
-and the PM filter are kept; everything else is replaced by what's in the Access file.
-
-From the command line: `manage.py import_access --reset [--source PATH] [--pm "First Last" | --all-pms]`.
-Set `MBN_DB` to another file path to try things on a copy of the database.
+None of this needs administrator rights. Set `MBN_DB` to another file path to try things on a copy of the
+database.
 
 ## Screens
 | Screen | What it shows |
@@ -92,8 +88,7 @@ Hover over any bar, chart or calendar entry for its details.
   The MPSR forecast (cash flow and milestone dates) starts from the charter's approved values.
 - **Cash flow must equal the total budget.** On the charter and every PCCF (new or edited), previous years +
   Q1–Q4 + next year + future must add up to the total budget including fee (within $1 for rounding). A bar above
-  Save shows both totals; Save stays greyed out with an explanation until they match. All PCCFs imported from
-  Access already balance.
+  Save shows both totals; Save stays greyed out with an explanation until they match.
 - PCCF and charter forms are laid out in sections: submission, budget (design / construction / fee), approved
   schedule (six milestones in order), approved cash flow (previous years · Q1–Q4 with a this-year total · next
   and future years), notes. Confirmed drawings, revised occupancy, estimate class and stream were removed.
@@ -108,14 +103,13 @@ Hover over any bar, chart or calendar entry for its details.
   Numbers never change once assigned.
 - The charter can be edited but not deleted or renumbered, and a project's last remaining PCCF can't be deleted.
   To remove a project entirely, delete the project.
-- Older projects imported without a charter show a note with an *Add the charter* link.
+- Older projects without a charter show a note with an *Add the charter* link.
 
 ### PCCF notes and fiscal years
-- Each PCCF has one **Notes** field. The four Access fields (scope, methodology, milestone and budget changes)
-  were merged into it: "No change" answers dropped, and sentences repeated between them kept only once.
-  Notes come up for each submission on a project's *Budget & PCCFs* tab.
+- Each PCCF has one **Notes** field (scope, methodology, milestone and budget changes). Notes come up for each
+  submission on a project's *Budget & PCCFs* tab.
 - Fiscal years run April to March and are shown as **2024/25**. They're stored as the year the fiscal year ends
-  (2025), which is how Access stored them.
+  (2025).
 
 ### Milestone marks
 The calendar shows every project's milestones, past and future (switch to active projects only with the drop-down).
@@ -134,18 +128,6 @@ The calendar uses the MPSR forecast date, or the approved PCCF date when there's
 - Change orders take their project from their PO. Only **approved** change orders count as pending.
   Processing one adds it to the PO value, and can only happen once.
 - Adding an invoice warns if the number is already on that PO, or if it exceeds what's left on the PO.
-
-## Re-importing from Access
-```
-.venv\Scripts\python.exe manage.py import_access --reset
-.venv\Scripts\python.exe manage.py reconcile_access
-```
-`import_access` reads a temporary copy of `MBN.accdb` (default `Downloads\MBN.accdb` in your user folder, or set
-`MBN_ACCESS_SOURCE`), so the original is never touched. Use `--source <path>` for a different file.
-`--reset` **replaces everything** in this app, including any work done here since the last import.
-`reconcile_access` compares each project's totals with Access's `Project_Financials` query.
-While importing, the known Access data problems (e.g. mistyped invoice dates, records left on deleted
-projects, duplicate entries) are fixed automatically (`_import_fixes.py`); nothing about them is stored.
 
 ## Tests
 ```

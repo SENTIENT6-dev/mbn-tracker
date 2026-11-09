@@ -4,7 +4,7 @@
 <div class="page-head"><div><h1>Settings</h1>
   <div class="sub">This tracker belongs to {{ me }}. {{ project_count }} project{{ project_count|pluralize }}.</div></div></div>
 
-<div class="grid g2">
+<div style="max-width:820px">
   <form method="post" class="panel stack">{% csrf_token %}
     <div class="panel-head"><h2>About you</h2></div>
     <p class="ink2" style="margin-top:-6px">You're the project manager on every project here. Changing your name updates all of them.</p>
@@ -19,12 +19,6 @@
     <div><button class="btn primary" name="save_profile" value="1">Save my details</button></div>
   </form>
 
-  <form method="post" class="panel stack" onsubmit="if(event.submitter&&event.submitter.name==='run_import'){event.submitter.disabled=true;event.submitter.textContent='Importing… this takes about a minute'}">{% csrf_token %}
-    <div class="panel-head"><h2>Reload from Access</h2></div>
-    <p class="ink2" style="margin-top:-6px">Use this when you get a newer copy of the MBN Access database.{% if owner.access_source %} Last loaded from <code>{{ owner.access_source }}</code>.{% endif %}</p>
-    {% include "tracker/_import_fields.html" with imp=imp %}
-    <div><button class="btn" name="run_import" value="1">Import from Access</button></div>
-  </form>
 </div>
 
 <div class="panel">

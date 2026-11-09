@@ -1,8 +1,0 @@
-{{ imp.non_field_errors }}
-<p>{{ imp.source.label_tag }}{{ imp.source }}<span class="helptext">{{ imp.source.help_text }}</span>{{ imp.source.errors }}</p>
-<p><label style="display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)">{{ imp.only_mine }} {{ imp.only_mine.label }}</label>
-  <span class="helptext">Leave ticked if the Access file is shared by several PMs. Untick to bring in every project.</span></p>
-{% if imp.confirm %}
-<div class="banner" style="margin:6px 0 10px">This tracker already has data. Importing replaces all of it (projects, POs, invoices, contacts) with what's in the Access file.</div>
-<p style="max-width:260px">{{ imp.confirm.label_tag }}{{ imp.confirm }}{{ imp.confirm.errors }}</p>
-{% endif %}

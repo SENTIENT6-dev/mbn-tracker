@@ -5,7 +5,6 @@ backups/
 *.accdb
 *.mdb
 *.xlsx
-tracker/management/commands/_local_fixes.py
 
 # Local environment
 .venv/

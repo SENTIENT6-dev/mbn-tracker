@@ -1,7 +1,5 @@
 Django==4.2.16
 openpyxl
-# Access import (Windows only)
-pyodbc; sys_platform == "win32"
 # Server only
 gunicorn==22.0.0; sys_platform != "win32"
 whitenoise==6.7.0; sys_platform != "win32"

@@ -3,16 +3,10 @@
 {% block content %}
 <div style="max-width:720px">
   <div class="page-head"><div>
-    <h1>{% if step == "profile" %}Set up your project tracker{% else %}Load your projects{% endif %}</h1>
-    <div class="sub">Each project manager has their own tracker. {% if step == "profile" %}Start by telling it who you are.{% else %}Bring your projects in from the Access database, or start empty.{% endif %}</div>
+    <h1>Set up your project tracker</h1>
+    <div class="sub">Each project manager has their own tracker. Start by telling it who you are.</div>
   </div></div>
 
-  <div class="setup-steps">
-    <span class="{% if step == 'profile' %}on{% else %}done{% endif %}">{% if step != 'profile' %}✓{% else %}1{% endif %} · About you</span>
-    <span class="{% if step == 'import' %}on{% endif %}">2 · Your projects</span>
-  </div>
-
-  {% if step == "profile" %}
   <form method="post" class="panel stack">{% csrf_token %}
     <div class="panel-head"><h2>About you</h2></div>
     <p class="ink2" style="margin-top:-6px">You'll be the project manager on every project in this tracker, as a BGIS employee.</p>
@@ -24,17 +18,7 @@
       <p>{{ profile.phone.label_tag }}{{ profile.phone }}{{ profile.phone.errors }}</p>
       <p>{{ profile.position.label_tag }}{{ profile.position }}{{ profile.position.errors }}</p>
     </div>
-    <div><button class="btn primary">Continue</button></div>
+    <div><button class="btn primary">Start</button></div>
   </form>
-  {% else %}
-  <form method="post" class="panel stack" onsubmit="this.querySelector('.js-import').disabled=true;this.querySelector('.js-import').textContent='Importing… this takes about a minute'">{% csrf_token %}
-    <div class="panel-head"><h2>Import from Access</h2></div>
-    {% include "tracker/_import_fields.html" with imp=imp %}
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn primary js-import" name="run_import">Import my projects</button>
-      <button class="btn" name="skip" value="1" formnovalidate>{% if has_data %}Keep the current data{% else %}Skip, start empty{% endif %}</button>
-    </div>
-  </form>
-  {% endif %}
 </div>
 {% endblock %}

@@ -187,8 +187,6 @@ class Project(models.Model):
     kind = models.PositiveSmallIntegerField(choices=Kind.choices, default=Kind.MINISTRY)
     phase = models.PositiveSmallIntegerField(choices=Phase.choices, null=True, blank=True)
     status = models.PositiveSmallIntegerField(choices=Status.choices, default=Status.ACTIVE)
-    needs_review = models.BooleanField(default=False,
-                                       help_text="Created during migration to hold records whose project was missing")
 
     class Meta:
         ordering = ["io_number"]
@@ -552,8 +550,6 @@ class Owner(models.Model):
     Every project in this tracker is theirs; it's set up on first run and changed under Settings.
     """
     person = models.OneToOneField(Person, on_delete=models.PROTECT, related_name="owner_of")
-    access_source = models.CharField("Access file", max_length=500, blank=True,
-                                     help_text="Where this PM's MBN.accdb was last imported from")
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

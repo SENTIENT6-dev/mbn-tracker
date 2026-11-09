@@ -48,7 +48,6 @@ from .textutil import current_fiscal_year, fiscal_label
 ZERO = Decimal("0")
 STATUS_FILTERS = {
     "active": [Project.Status.ACTIVE, Project.Status.ON_HOLD],
-    "review": None,
     "all": None,
 }
 
@@ -199,8 +198,6 @@ def dashboard(request):
     projects = Project.objects.select_related("project_manager", "current_status__stage")
     if show in ("active", "pccf", "approaching", "kpi_issue", "kpi"):
         projects = projects.filter(status__in=STATUS_FILTERS["active"])
-    elif show == "review":
-        projects = projects.filter(needs_review=True)
     if q:
         projects = projects.filter(Q(io_number__icontains=q) | Q(title__icontains=q) | Q(bgis_number__icontains=q))
     rows = financials(projects)

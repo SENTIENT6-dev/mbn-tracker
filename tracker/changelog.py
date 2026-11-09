@@ -1,7 +1,7 @@
 """Change log for purchase orders, invoices and change orders.
 
 Every save or delete of one of these is recorded (old and new values) by Django signals, so it doesn't matter
-which screen made the change. Bulk loads (the Access import, demo data) switch it off with `quiet()`.
+which screen made the change. Bulk loads (demo data) switch it off with `quiet()`.
 """
 import threading
 from contextlib import contextmanager, suppress

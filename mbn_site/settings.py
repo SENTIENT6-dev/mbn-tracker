@@ -150,8 +150,6 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Default location of the Access file used by `manage.py import_access`
-ACCESS_SOURCE = os.environ.get('MBN_ACCESS_SOURCE', str(Path.home() / 'Downloads' / 'MBN.accdb'))
 
 # Backups of the database (see tracker/backup.py). MBN_BACKUP_DIR can point at e.g. a OneDrive folder.
 BACKUP_DIR = os.environ.get('MBN_BACKUP_DIR', str(BASE_DIR / 'backups'))

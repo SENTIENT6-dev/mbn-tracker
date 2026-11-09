@@ -1030,6 +1030,40 @@ class RolloverTests(Base):
         # now current: compared with the PCCF again (approved 3,000 this year vs forecast 1,000.01)
         self.assertTrue(project_financials(Project.objects.get(pk=self.p.pk)).pccf_required)
 
+    def test_approved_lined_up_with_forecast_year(self):
+        from .services import approved_for_year
+        pc = PCCF.objects.get(project=self.p)
+        PCCF.objects.filter(pk=pc.pk).update(fiscal_year=self.fy - 1, previous=D("50"), next_year=D("4000"),
+                                             future=D("700"))
+        pc.refresh_from_db()
+        same = approved_for_year(pc, self.fy - 1)
+        self.assertEqual((same["q1"], same["year"], same["next_year"], same["shifted"]),
+                         (D("1000"), D("3000"), D("4000"), False))
+        moved = approved_for_year(pc, self.fy)            # forecast rolled to this year, PCCF from last year
+        self.assertEqual((moved["previous"], moved["q1"], moved["year"], moved["next_year"], moved["future"]),
+                         (D("3050"), None, D("4000"), None, D("700")))
+        self.assertTrue(moved["shifted"])
+        self.assertIsNone(approved_for_year(pc, self.fy + 1)["year"])   # too far apart: nothing to compare
+
+    def test_screens_after_rollover_compare_same_year(self):
+        from unittest import mock
+        PCCF.objects.filter(project=self.p).update(fiscal_year=self.fy - 1, next_year=D("4000"))
+        with mock.patch("tracker.rollover.backup_database", return_value=None):
+            self.client.post("/mpsr/rollover/", {"project": [str(self.p.pk)]})
+        r = self.client.get(f"/mpsr/{self.p.pk}/")
+        ap = r.context["ap"]
+        self.assertEqual((ap["q1"], ap["year"]), (None, D("4000")))
+        self.assertEqual(r.context["approved_year"], D("4000"))
+        self.assertContains(r, "It isn't split by quarter")
+        r = self.client.get(f"/projects/{self.p.pk}/")
+        self.assertEqual([q["approved"] for q in r.context["quarters"]], [None] * 4)
+        self.assertContains(r, "not split by quarter in PCCF 0")
+        # value of work stores this year's approved funding, not the PCCF's own year
+        self.client.post(f"/projects/{self.p.pk}/update/vow/", {
+            "vow-reporting_date": "2026-11-01", "vow-previous_years_with_fees": "0",
+            "vow-current_year_no_fees": "100"})
+        self.assertEqual(ValueOfWork.objects.get(project=self.p).current_year_funding, D("4000"))
+
     def test_nothing_ticked(self):
         r = self.client.post("/mpsr/rollover/", {}, follow=True)
         self.assertContains(r, "no projects were ticked")

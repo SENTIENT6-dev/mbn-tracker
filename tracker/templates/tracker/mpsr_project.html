@@ -43,10 +43,11 @@
       <table class="compact">
         <thead><tr><th></th><th class="n">Prev. yrs</th><th class="n">Q1</th><th class="n">Q2</th><th class="n">Q3</th><th class="n">Q4</th><th class="n">This FY</th><th class="n">Next</th><th class="n">Future</th></tr></thead>
         <tbody>
-          {% if fin.pccf %}<tr><td class="ink2" title="From PCCF {{ fin.pccf.submission }}. Only a new PCCF changes these.">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{{ fin.pccf.q1|money }}</td><td class="n">{{ fin.pccf.q2|money }}</td><td class="n">{{ fin.pccf.q3|money }}</td><td class="n">{{ fin.pccf.q4|money }}</td><td class="n"><strong>{% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</strong></td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
+          {% if ap %}<tr><td class="ink2" title="From PCCF {{ fin.pccf.submission }} (FY {{ ap.pccf_year|default:'–' }}). Only a new PCCF changes these.">Approved</td><td class="n">{{ ap.previous|money }}</td><td class="n">{{ ap.q1|money }}</td><td class="n">{{ ap.q2|money }}</td><td class="n">{{ ap.q3|money }}</td><td class="n">{{ ap.q4|money }}</td><td class="n"><strong>{% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</strong></td><td class="n">{{ ap.next_year|money }}</td><td class="n"{% if ap.shifted %} title="Next year and later"{% endif %}>{{ ap.future|money }}</td></tr>{% endif %}
           <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n">{{ status.q1|money }}</td><td class="n">{{ status.q2|money }}</td><td class="n">{{ status.q3|money }}</td><td class="n">{{ status.q4|money }}</td><td class="n {% if 'cash' in flagged %}differs{% endif %}" id="live-fy-cell"><strong>{{ status.current_year_forecast|money }}</strong></td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
         </tbody>
       </table>
+      {% include "tracker/_approved_note.html" %}
     </div>
 
     <div class="panel">

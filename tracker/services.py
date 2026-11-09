@@ -60,16 +60,39 @@ class PCCFReason:
                 f"({abs(d)} day{'s' if abs(d) != 1 else ''} {'later' if d > 0 else 'earlier'})")
 
 
-def approved_cash_for_year(pccf, fiscal_year):
-    """What the PCCF approved for the forecast's fiscal year, or None when the PCCF doesn't cover it.
+def approved_for_year(pccf, fiscal_year):
+    """The PCCF's approved cash flow lined up with the forecast's fiscal year, so the two compare like for like.
 
-    A PCCF written last fiscal year approved this year's spend as its "next year" figure.
+    Keys: previous, q1-q4, year (Q1-Q4 total), next_year, future, plus pccf_year (label) and shifted.
+      * PCCF from the same fiscal year: its own figures.
+      * PCCF from last fiscal year: its Q1-Q4 are now previous years, and its "next year" is this year's
+        approved total. A PCCF doesn't split next year by quarter, and its "future" covers next year and
+        later together, so q1-q4 and next_year are None (shown as –) and future holds next year + later.
+      * Anything else (older PCCF, or one newer than the forecast): every figure is None.
     """
+    if pccf is None:
+        return None
+    base = {"pccf_year": pccf.fiscal_year_label, "shifted": False}
     if fiscal_year is None or pccf.fiscal_year is None or pccf.fiscal_year == fiscal_year:
-        return pccf.current_year_cash_flow
+        return {**base, "previous": pccf.previous, "q1": pccf.q1, "q2": pccf.q2, "q3": pccf.q3, "q4": pccf.q4,
+                "year": pccf.current_year_cash_flow, "next_year": pccf.next_year, "future": pccf.future}
+    blank = dict.fromkeys(["q1", "q2", "q3", "q4", "next_year"])
     if pccf.fiscal_year == fiscal_year - 1:
-        return pccf.next_year
-    return None
+        return {**base, **blank, "shifted": True, "previous": pccf.previous + pccf.current_year_cash_flow,
+                "year": pccf.next_year, "future": pccf.future}
+    return {**base, **blank, "shifted": True, "previous": None, "year": None, "future": None}
+
+
+def approved_cash_for_year(pccf, fiscal_year):
+    """What the PCCF approved for the forecast's fiscal year (Q1-Q4 total), or None when it doesn't say."""
+    return approved_for_year(pccf, fiscal_year)["year"]
+
+
+def current_year_funding(pccf, status):
+    """This fiscal year's funding, stored with each value-of-work entry: the approved amount for the forecast's
+    year when the PCCF gives one, otherwise the forecast itself."""
+    approved = approved_cash_for_year(pccf, status.fiscal_year) if pccf else None
+    return approved if approved is not None else status.current_year_forecast
 
 
 def forecast_is_stale(status, today=None):
@@ -180,6 +203,11 @@ class Financials:
     @property
     def pccf_required(self):
         return bool(self.pccf_reasons)
+
+    @property
+    def approved(self):
+        """Approved cash flow lined up with the forecast's fiscal year (see approved_for_year)."""
+        return approved_for_year(self.pccf, self.status.fiscal_year if self.status else None)
 
     @property
     def forecast_stale(self):

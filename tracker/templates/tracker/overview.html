@@ -55,6 +55,7 @@ Approved (PCCF): {{ q.approved|money }}
 Current forecast: {{ q.forecast|money }}"><div class="b a" style="height:{{ q.a_pct|floatformat:"2u" }}%"></div><div class="b f" style="height:{{ q.f_pct|floatformat:"2u" }}%"></div></div>{% endfor %}
         </div>
         <div class="qlab">{% for q in cash %}<div>{{ q.label }}<div class="muted">{{ q.forecast|money }}</div></div>{% endfor %}</div>
+        {% if cash_projects < rows|length %}<p class="muted" style="font-size:11.5px;margin:8px 0 0">{{ cash_projects }} of {{ rows|length }} projects: only those whose latest PCCF was written for the same fiscal year as the forecast have approved quarters to compare.</p>{% endif %}
       </div>
       <div class="panel">
         <div class="panel-head"><h2>Top vendors, active projects</h2><span class="spacer"></span><a href="/vendors/">All →</a></div>

@@ -1,0 +1,8 @@
+{% load money %}{# Note under a cash-flow table when the approved PCCF is from another fiscal year. Needs: ap, fin, status #}
+{% if ap.shifted %}
+<p class="muted" style="font-size:12px;margin:8px 0 0">
+  {% if ap.year != None %}PCCF {{ fin.pccf.submission }} was written for FY {{ ap.pccf_year }}. Its "next year" ({{ ap.year|money }}) is this year's approved total.
+    It isn't split by quarter, and its "future" covers next year and later together. A PCCF for FY {{ status.fiscal_year_label }} will show the full breakdown.
+  {% else %}PCCF {{ fin.pccf.submission }} is for FY {{ ap.pccf_year }}, so it has no approved figures for FY {{ status.fiscal_year_label }}.{% endif %}
+</p>
+{% endif %}

@@ -138,7 +138,7 @@ Actual: {{ t.e.actual }}">✓</span>{% endif %}
     <div class="cols">
       {% for q in quarters %}
         <div class="q" data-tip="{{ q.label }}
-Approved: {{ q.approved|money }}
+Approved: {% if q.approved != None %}{{ q.approved|money }}{% else %}not split by quarter in PCCF {{ fin.pccf.submission }}{% endif %}
 Forecast: {{ q.forecast|money }}">
           <div class="b a" style="height:{{ q.a_pct|floatformat:"2u" }}%"></div>
           <div class="b f" style="height:{{ q.f_pct|floatformat:"2u" }}%"></div>
@@ -149,10 +149,11 @@ Forecast: {{ q.forecast|money }}">
     <table style="margin-top:14px">
       <thead><tr><th></th><th class="n">Previous yrs</th><th class="n">This year</th><th class="n">Next year</th><th class="n">Future</th></tr></thead>
       <tbody>
-        {% if fin.pccf %}<tr><td class="ink2" title="From PCCF {{ fin.pccf.submission }}. Only a new PCCF changes these.">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
+        {% if ap %}<tr><td class="ink2" title="From PCCF {{ fin.pccf.submission }} (FY {{ ap.pccf_year|default:'–' }}). Only a new PCCF changes these.">Approved</td><td class="n">{{ ap.previous|money }}</td><td class="n">{% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</td><td class="n">{{ ap.next_year|money }}</td><td class="n"{% if ap.shifted %} title="Next year and later"{% endif %}>{{ ap.future|money }}</td></tr>{% endif %}
         <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n {% if 'cash' in flagged %}differs{% endif %}">{{ status.current_year_forecast|money }}</td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
       </tbody>
     </table>
+    {% include "tracker/_approved_note.html" %}
     <details style="margin-top:12px"><summary>Update forecast</summary>
       <form method="post" action="/projects/{{ project.pk }}/update/cash/" class="stack cols" style="margin-top:10px">{% csrf_token %}
         {{ cash_form.as_p }}<p class="full"><button class="btn primary">Save cash flow</button></p></form></details>

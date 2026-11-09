@@ -14,7 +14,7 @@ from django.utils import timezone
 from . import forms as F
 from .models import MPSRReview, Project, ProjectStatus, StatusHistory, ValueOfWork
 from .textutil import current_fiscal_year, fiscal_label
-from .services import (approved_cash_for_year, financials, flagged_keys, forecast_is_stale, milestones,
+from .services import (approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, milestones,
                        pccf_flag_message, project_financials)
 
 ZERO = Decimal("0")
@@ -114,8 +114,7 @@ def _save(project, status, fin, forms, period):
         status.save()
 
         v = forms["vow"]
-        entry = v.to_entry(project, fin.fee_percent,
-                           fin.pccf.current_year_cash_flow if fin.pccf else status.current_year_forecast)
+        entry = v.to_entry(project, fin.fee_percent, current_year_funding(fin.pccf, status))
         last = fin.vow
         # only a real change creates a new entry (converting with/without fees can shift a few cents)
         if not last or abs(entry["total_no_fees"] - last.total_no_fees) > Decimal("1") or \
@@ -197,6 +196,7 @@ def mpsr_project(request, pk):
         "reviewed": MPSRReview.objects.filter(project=project, period=period).first(),
         "forecast_total": forecast_total, "forecast_variance": forecast_total - fin.budget_with_fee,
         "flagged": flagged_keys(fin), "current_fy": current_fiscal_year(today),
+        "ap": approved_for_year(fin.pccf, status.fiscal_year),
         "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year)
         if fin.pccf and not forecast_is_stale(status) else None,
         "done_count": len(done & set(order))})

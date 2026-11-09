@@ -15,7 +15,7 @@ from .textutil import current_fiscal_year, fiscal_label
 from .models import (PCCF, ChangeOrder, DataIssue, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
                      PurchaseOrder, StageGate, StatusHistory, ValueOfWork)
 from .operations import save_change_order
-from .services import (approved_cash_for_year, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
+from .services import (approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
                        resolve_schedule_issue, schedule_health)
 
 ZERO = Decimal("0")
@@ -81,11 +81,13 @@ def overview(request):
     last12 = sum((m["t"] for m in months[-12:]), ZERO)
 
     # Portfolio cash flow this fiscal year: approved (latest PCCF) vs current forecast
+    # Approved quarters only exist for PCCFs written for the same fiscal year as the forecast; projects whose
+    # latest PCCF is from an earlier year have no approved quarterly split, so they're left out of both bars.
+    split = [f for f in rows if f.approved and f.approved["q1"] is not None and f.status]
     cash = []
     for label, field in (("Q1", "q1"), ("Q2", "q2"), ("Q3", "q3"), ("Q4", "q4")):
-        appr = sum((getattr(f.pccf, field) for f in rows if f.pccf), ZERO)
-        fc = sum((getattr(f.project.current_status, field) for f in rows
-                  if hasattr(f.project, "current_status")), ZERO)
+        appr = sum((f.approved[field] for f in split), ZERO)
+        fc = sum((getattr(f.status, field) for f in split), ZERO)
         cash.append({"label": label, "approved": appr, "forecast": fc})
     ctop = max([c["approved"] for c in cash] + [c["forecast"] for c in cash] + [Decimal(1)])
     for c in cash:
@@ -99,7 +101,7 @@ def overview(request):
         v["pct"] = float(v["t"] / vtop * 100)
 
     return render(request, "tracker/overview.html", {
-        "months": months, "last12": last12, "cash": cash, "vendors": vend, "latest_invoice": latest,
+        "months": months, "last12": last12, "cash": cash, "cash_projects": len(split), "vendors": vend, "latest_invoice": latest,
         "rows": sorted(rows, key=lambda f: -f.budget), "totals": totals, "stages": stages,
         "upcoming": upcoming[:12], "upcoming_count": len(upcoming), "overdue_count": len(overdue),
         "attention": attention[:8], "today": today, "pccf_count": sum(f.pccf_required for f in rows),
@@ -233,18 +235,20 @@ def project_detail(request, pk):
     years = [{"label": y, "pos": at(date(y, 1, 1))} for y in range(lo.year + 1, hi.year + 1)]
 
     # Cash flow: approved (PCCF) vs current forecast per quarter
+    # (approved lined up with the forecast's fiscal year: a PCCF from last year has no quarters for this one)
+    ap = approved_for_year(fin.pccf, status.fiscal_year)
     quarters = []
     for label, field in (("Q1", "q1"), ("Q2", "q2"), ("Q3", "q3"), ("Q4", "q4")):
-        quarters.append({"label": label, "approved": getattr(fin.pccf, field, ZERO) if fin.pccf else ZERO,
-                         "forecast": getattr(status, field)})
-    top = max([q["approved"] for q in quarters] + [q["forecast"] for q in quarters] + [Decimal("1")])
+        quarters.append({"label": label, "approved": ap[field] if ap else None, "forecast": getattr(status, field)})
+    top = max([q["approved"] or ZERO for q in quarters] + [q["forecast"] for q in quarters] + [Decimal("1")])
     for q in quarters:
-        q["a_pct"], q["f_pct"] = float(q["approved"] / top * 100), float(q["forecast"] / top * 100)
+        q["a_pct"] = float((q["approved"] or ZERO) / top * 100)
+        q["f_pct"] = float(q["forecast"] / top * 100)
 
     ctx = {
         "project": project, "status": status, "fin": fin, "pos": pos, "tab": tab,
         "stepper": stepper, "timeline": timeline, "years": years, "today_pos": at(today),
-        "quarters": quarters, "cash_top": top, "flagged": flagged_keys(fin),
+        "quarters": quarters, "cash_top": top, "flagged": flagged_keys(fin), "ap": ap,
         "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year)
         if fin.pccf and not forecast_is_stale(status) else None,
         "pccfs": pccfs, "has_charter": any(p.submission == 0 for p in pccfs),
@@ -327,9 +331,7 @@ def project_update(request, pk, section):
             form = F.VOWForm(request.POST, prefix="vow")
             fin = project_financials(project)
             if form.is_valid():
-                funding = status.q1 + status.q2 + status.q3 + status.q4 if fin.pccf is None else \
-                    fin.pccf.current_year_cash_flow
-                entry = form.to_entry(project, fin.fee_percent, funding)
+                entry = form.to_entry(project, fin.fee_percent, current_year_funding(fin.pccf, status))
                 ValueOfWork.objects.update_or_create(project=project, reporting_date=entry.pop("reporting_date"),
                                                      defaults={k: v for k, v in entry.items() if k != "project"})
                 messages.success(request, "Value of work recorded")

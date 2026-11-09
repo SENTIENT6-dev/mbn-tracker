@@ -12,7 +12,8 @@
     <a href="?show=all&q={{ q|urlencode }}" class="{% if show == 'all' %}on{% endif %}">All</a>
   </div>
   <form method="get"><input type="hidden" name="show" value="{{ show }}"><input name="q" value="{{ q }}" placeholder="Search number or title" style="width:220px"></form>
-  <a class="btn primary" href="/projects/new/">+ New project</a>
+  <details class="more-menu"><summary class="btn" aria-label="More actions" title="More actions">⋯</summary>
+    <div class="menu"><a href="/projects/new/">+ New project</a></div></details>
 </div>
 
 <div class="tablewrap">

@@ -482,6 +482,13 @@ class OwnerTests(TestCase):
         self.assertEqual(self.client.get("/").status_code, 200)
         self.assertRedirects(self.client.get("/setup/"), "/settings/", fetch_redirect_response=False)
 
+    def test_new_project_only_on_projects_behind_menu(self):
+        from .operations import set_owner
+        set_owner("Jo", "Smith")
+        self.assertNotContains(self.client.get("/"), 'href="/projects/new/"')
+        r = self.client.get("/projects/")
+        self.assertContains(r, '<div class="menu"><a href="/projects/new/">+ New project</a></div>', html=True)
+
     def test_projects_belong_to_the_owner(self):
         from .operations import set_owner
         set_owner("Jo", "Smith")

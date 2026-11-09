@@ -6,7 +6,7 @@ Replacement for `MBN.accdb`: projects, PCCF budgets, POs, invoices, change order
 as a local web app (Python + Django + SQLite). Data lives in `db.sqlite3` in this folder.
 
 **Each project manager has their own tracker.** The first time it opens, it asks who you are (you become
-the PM on every project in it); then you add your projects with **+ New project**.
+the PM on every project in it); then you add your projects from **Projects → ⋯ → New project**.
 
 ## Start it
 Double-click `start.bat`. It opens http://127.0.0.1:8000/ in your browser.

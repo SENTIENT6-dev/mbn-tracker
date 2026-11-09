@@ -4,7 +4,6 @@
   <div><h1>{% if me %}{{ me.first_name }}'s projects{% else %}Overview{% endif %}</h1><div class="sub">Active and on-hold projects · {{ today|date:"l, F j, Y" }}</div></div>
   <span class="spacer"></span>
   <a class="btn" href="/calendar/">Open calendar</a>
-  <a class="btn primary" href="/projects/new/">+ New project</a>
 </div>
 
 {% include "tracker/_rollover_banner.html" %}

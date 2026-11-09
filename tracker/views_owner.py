@@ -25,7 +25,7 @@ def setup(request):
     if request.method == "POST" and profile.is_valid():
         set_owner(**profile.cleaned_data, keep_existing=True)
         messages.success(request, f"Welcome, {profile.cleaned_data['first_name']}. This tracker is now yours. "
-                                  f"Add your first project with “+ New project”.")
+                                  f"Add your first project from Projects → ⋯ → New project.")
         return redirect("overview")
     return render(request, "tracker/setup.html", {"profile": profile})
 

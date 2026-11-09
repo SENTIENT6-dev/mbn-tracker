@@ -5,7 +5,9 @@
   <span class="spacer"></span>
   <div class="seg">
     <a href="?show=active&q={{ q|urlencode }}" class="{% if show == 'active' %}on{% endif %}">Active &amp; on hold</a>
-    <a href="?show=pccf&q={{ q|urlencode }}" class="{% if show == 'pccf' %}on{% endif %}">PCCF required{% if pccf_count != None %} ({{ pccf_count }}){% endif %}</a>
+    <a href="?show=pccf&q={{ q|urlencode }}" class="{% if show == 'pccf' %}on{% endif %}">PCCF required{% if counts %} ({{ counts.pccf }}){% endif %}</a>
+    <a href="?show=approaching&q={{ q|urlencode }}" class="{% if show == 'approaching' %}on{% endif %}">Approaching target{% if counts %} ({{ counts.approaching }}){% endif %}</a>
+    <a href="?show=kpi&q={{ q|urlencode }}" class="{% if show == 'kpi' %}on{% endif %}">KPI failures{% if counts %} ({{ counts.kpi }}){% endif %}</a>
     <a href="?show=all&q={{ q|urlencode }}" class="{% if show == 'all' %}on{% endif %}">All</a>
   </div>
   <form method="get"><input type="hidden" name="show" value="{{ show }}"><input name="q" value="{{ q }}" placeholder="Search number or title" style="width:220px"></form>
@@ -17,7 +19,7 @@
   <thead><tr>
     <th>Project</th><th>Status</th><th>Stage</th><th style="min-width:210px">Budget used</th>
     <th class="n">Budget (no fee)</th><th class="n">Committed</th><th class="n">Invoiced</th><th class="n">VOW</th>
-    <th class="n">Uncommitted</th><th>Health</th><th>PCCF</th><th>Next milestone</th>
+    <th class="n">Uncommitted</th><th>Health</th><th>PCCF / targets</th><th>Next milestone</th>
   </tr></thead>
   <tbody>
   {% for f in rows %}
@@ -33,11 +35,13 @@
       <td class="n">{{ f.vow_total|money }}</td>
       <td class="n {% if f.remaining_budget|neg %}neg{% endif %}">{{ f.remaining_budget|money }}</td>
       <td class="nowrap">{% include "tracker/_health.html" with f=f %}</td>
-      <td class="nowrap">{% if f.pccf_required %}<a class="pill warn" href="/projects/{{ f.project.pk }}/" title="{% for r in f.pccf_reasons %}{{ r.text }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}">⚠ Required</a>{% endif %}</td>
+      <td class="nowrap">{% if f.pccf_required %}<a class="pill warn" href="/projects/{{ f.project.pk }}/" title="{% for r in f.pccf_reasons %}{{ r.text }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}">⚠ Required</a>{% endif %}
+        {% for w in f.approaching %}<span class="pill blue" title="{{ w.text }}">⏱ {{ w.days }}d</span>{% endfor %}
+        {% for k in f.kpi_failures %}<span class="pill crit" title="{{ k.get_milestone_display }} target {{ k.target }} missed">✗ KPI</span>{% endfor %}</td>
       <td class="nowrap">{% if f.schedule.next %}{{ f.schedule.next.label }}<div class="ink2" style="font-size:12px">{{ f.schedule.next.date }}</div>{% else %}<span class="muted">–</span>{% endif %}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="12" class="muted">{% if show == 'pccf' %}No projects need a PCCF.{% else %}No projects match.{% endif %}</td></tr>
+    <tr><td colspan="12" class="muted">{% if show == 'pccf' %}No projects need a PCCF.{% elif show == 'approaching' %}No approved target dates in the next 15 days.{% elif show == 'kpi' %}No KPI failures recorded.{% else %}No projects match.{% endif %}</td></tr>
   {% endfor %}
   </tbody>
 </table>

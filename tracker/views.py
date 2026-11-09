@@ -11,8 +11,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import forms as F
-from .models import (PCCF, ChangeOrder, DataIssue, Invoice, MPSRReview, Project, ProjectStatus, PurchaseOrder,
-                     StageGate, StatusHistory, ValueOfWork)
+from .models import (PCCF, ChangeOrder, DataIssue, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
+                     PurchaseOrder, StageGate, StatusHistory, ValueOfWork)
 from .operations import save_change_order
 from .services import (approved_cash_for_year, financials, flagged_keys, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
                        resolve_schedule_issue, schedule_health)
@@ -103,6 +103,8 @@ def overview(request):
         "upcoming": upcoming[:12], "upcoming_count": len(upcoming), "overdue_count": len(overdue),
         "attention": attention[:8], "today": today, "pccf_count": sum(f.pccf_required for f in rows),
         "pccf_rows": [f for f in sorted(rows, key=lambda f: f.project.io_number) if f.pccf_required][:6],
+        "approaching": sorted(((w, f) for f in rows for w in f.approaching), key=lambda x: x[0].days),
+        "kpi_count": sum(len(f.kpi_failures) for f in rows),
         "committed_pct": committed_pct, "invoiced_pct": invoiced_pct,
         "open_cos": ChangeOrder.objects.filter(status__in=["requested", "approved"]).count(),
         "mpsr_done": MPSRReview.objects.filter(period=today.replace(day=1), project__in=projects).count(),
@@ -163,23 +165,27 @@ def dashboard(request):
     show = request.GET.get("show", "active")
     q = request.GET.get("q", "").strip()
     projects = Project.objects.select_related("project_manager", "current_status__stage")
-    if show in ("active", "pccf"):
+    if show in ("active", "pccf", "approaching", "kpi"):
         projects = projects.filter(status__in=STATUS_FILTERS["active"])
     elif show == "review":
         projects = projects.filter(needs_review=True)
     if q:
         projects = projects.filter(Q(io_number__icontains=q) | Q(title__icontains=q) | Q(bgis_number__icontains=q))
     rows = financials(projects)
-    pccf_count = sum(f.pccf_required for f in rows) if show in ("active", "pccf") else None
-    if show == "pccf":
-        rows = [f for f in rows if f.pccf_required]
+    on_active = show in ("active", "pccf", "approaching", "kpi")
+    counts = {"pccf": sum(f.pccf_required for f in rows), "approaching": sum(bool(f.approaching) for f in rows),
+              "kpi": sum(bool(f.kpi_failures) for f in rows)} if on_active else {}
+    keep = {"pccf": lambda f: f.pccf_required, "approaching": lambda f: f.approaching,
+            "kpi": lambda f: f.kpi_failures}.get(show)
+    if keep:
+        rows = [f for f in rows if keep(f)]
     health = schedule_health(milestones(projects), timezone.localdate())
     for f in rows:
         f.schedule = health.get(f.project.pk, {"overdue": 0, "next": None})
     totals = _totals(rows, "budget_with_fee", "budget", "commitments", "pending", "invoiced", "remaining_budget",
                      "vow_total", "to_be_billed")
     return render(request, "tracker/projects.html", {"rows": rows, "totals": totals, "show": show, "q": q,
-                                                     "pccf_count": pccf_count})
+                                                     "counts": counts})
 
 
 # ------------------------------------------------------------------ projects
@@ -369,6 +375,47 @@ def tender_tick(request, pk):
     messages.success(request, f"{project.io_number}: tender marked as issued {issued}",
                      extra_tags=f"undo-tender-{project.pk}")
     return redirect(nxt)
+
+
+def _next(request, pk):
+    nxt = request.POST.get("next", "")
+    return nxt if nxt.startswith("/") and not nxt.startswith("//") else f"/projects/{pk}/"
+
+
+@require_POST
+def kpi_mark(request, pk, key):
+    """Record a missed target date as a KPI failure, so it stops asking for a PCCF."""
+    project = get_object_or_404(Project, pk=pk)
+    nxt = _next(request, pk)
+    reason = next((r for r in project_financials(project).pccf_reasons if r.key == key), None)
+    if reason is None or not reason.target_passed:
+        messages.error(request, "Not saved: only a target date that has already passed, and still asks for a "
+                                "PCCF, can be marked as a KPI failure.")
+        return redirect(nxt)
+    note = request.POST.get("note", "").strip()[:500]
+    with transaction.atomic():
+        k = KPIFailure.objects.create(project=project, milestone=key, target=reason.approved,
+                                      forecast=reason.forecast, note=note)
+        _log(project, StatusHistory.Kind.ACTUALS,
+             text=f"KPI failure: {reason.label} target {reason.approved} missed (forecast {reason.forecast})"
+                  + (f". {note}" if note else ""),
+             data={"kpi_failure": key, "target": reason.approved.isoformat()})
+    messages.success(request, f"{project.io_number}: {reason.label} recorded as a KPI failure "
+                              f"(target {reason.approved}). It no longer asks for a PCCF.",
+                     extra_tags=f"undo:/projects/{pk}/kpi/{k.pk}/undo/")
+    return redirect(nxt)
+
+
+@require_POST
+def kpi_undo(request, pk, kpi_id):
+    k = get_object_or_404(KPIFailure, pk=kpi_id, project_id=pk)
+    with transaction.atomic():
+        k.delete()
+        _log(k.project, StatusHistory.Kind.ACTUALS,
+             text=f"KPI failure removed: {k.get_milestone_display()} target {k.target}",
+             data={"kpi_failure_removed": k.milestone, "target": k.target.isoformat()})
+    messages.success(request, f"{k.project.io_number}: {k.get_milestone_display()} KPI failure removed.")
+    return redirect(_next(request, pk))
 
 
 def project_form(request, pk=None):

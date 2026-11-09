@@ -412,6 +412,31 @@ class ProjectStatus(models.Model):
         return fiscal_label(self.fiscal_year)
 
 
+class KPIFailure(models.Model):
+    """An approved target date that was missed and can no longer be moved by a PCCF (IO doesn't allow
+    changing target dates after they pass). Recording it stops that date from asking for a PCCF."""
+
+    class Milestone(models.TextChoices):
+        DESIGN_END = "design_end", "Design end"
+        SUBSTANTIAL = "substantial", "Substantial performance"
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="kpi_failures")
+    milestone = models.CharField(max_length=20, choices=Milestone.choices)
+    target = models.DateField(help_text="The approved (PCCF) date that was missed")
+    forecast = models.DateField(null=True, blank=True, help_text="Forecast when it was marked")
+    note = models.CharField(max_length=500, blank=True)
+    marked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-marked_at"]
+        constraints = [models.UniqueConstraint(fields=["project", "milestone", "target"],
+                                               name="one_kpi_failure_per_target")]
+        verbose_name = "KPI failure"
+
+    def __str__(self):
+        return f"{self.project.io_number} {self.get_milestone_display()} KPI failure (target {self.target})"
+
+
 class StatusHistory(models.Model):
     """Audit trail of every MPSR update (replaces the four *_History tables)."""
 

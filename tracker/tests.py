@@ -974,6 +974,87 @@ class TenderInConstructionTests(Base):
         self.assertNotContains(r, "data-tender-confirm=")     # no tick button left to press
 
 
+class KPIAndApproachingTests(Base):
+    """Cash flow is put in line so only the dates matter here."""
+
+    def setUp(self):
+        super().setUp()
+        from django.utils import timezone
+        self.today = timezone.localdate()
+        ProjectStatus.objects.filter(project=self.p).update(q1=D("1000"), q2=D("2000"))
+
+    def _dates(self, approved, forecast, field="substantial"):
+        PCCF.objects.filter(project=self.p).update(**{field: approved})
+        ProjectStatus.objects.filter(project=self.p).update(**{field: forecast})
+
+    def _fin(self):
+        return project_financials(Project.objects.get(pk=self.p.pk))
+
+    def test_missed_target_can_be_marked_kpi_failure_and_undone(self):
+        from .models import KPIFailure
+        target = self.today - dt.timedelta(days=10)
+        self._dates(target, self.today + dt.timedelta(days=40))
+        reason = self._fin().pccf_reasons[0]
+        self.assertTrue(reason.target_passed)
+        r = self.client.get(f"/projects/{self.p.pk}/")
+        self.assertContains(r, "Mark as KPI failure")
+        r = self.client.post(f"/projects/{self.p.pk}/kpi/substantial/mark/",
+                             {"note": "Permit delay", "next": f"/mpsr/{self.p.pk}/"}, follow=True)
+        k = KPIFailure.objects.get()
+        self.assertEqual((k.milestone, k.target, k.note), ("substantial", target, "Permit delay"))
+        self.assertFalse(self._fin().pccf_required)                  # no longer asks for a PCCF
+        self.assertContains(r, "recorded as a KPI failure")
+        self.assertContains(r, f'action="/projects/{self.p.pk}/kpi/{k.pk}/undo/" class="msg-undo"')
+        self.assertContains(r, "KPI failures")                      # listed on the page
+        self.assertTrue(StatusHistory.objects.filter(project=self.p, text__startswith="KPI failure").exists())
+        self.client.post(f"/projects/{self.p.pk}/kpi/{k.pk}/undo/", {"next": "/"})
+        self.assertFalse(KPIFailure.objects.exists())
+        self.assertTrue(self._fin().pccf_required)                   # back to asking for a PCCF
+
+    def test_future_target_cannot_be_marked(self):
+        from .models import KPIFailure
+        self._dates(self.today + dt.timedelta(days=60), self.today + dt.timedelta(days=90))
+        self.assertFalse(self._fin().pccf_reasons[0].target_passed)
+        self.assertNotContains(self.client.get(f"/projects/{self.p.pk}/"), "Mark as KPI failure")
+        r = self.client.post(f"/projects/{self.p.pk}/kpi/substantial/mark/", follow=True)
+        self.assertContains(r, "Not saved")
+        self.assertFalse(KPIFailure.objects.exists())
+
+    def test_kpi_failure_only_covers_that_target(self):
+        """Other dates still flag, and so does the same milestone if a new PCCF sets a new target."""
+        from .models import KPIFailure
+        old = self.today - dt.timedelta(days=5)
+        self._dates(old, self.today + dt.timedelta(days=30))
+        self._dates(self.today - dt.timedelta(days=50), self.today, field="design_end")
+        KPIFailure.objects.create(project=self.p, milestone="substantial", target=old)
+        self.assertEqual([r.key for r in self._fin().pccf_reasons], ["design_end"])
+        PCCF.objects.create(project=self.p, submission=1, q1=D("1000"), q2=D("2000"),
+                            substantial=self.today + dt.timedelta(days=10), design_end=self.today)
+        self.assertEqual([r.key for r in self._fin().pccf_reasons], ["substantial"])
+
+    def test_approaching_target_within_15_days(self):
+        for days, expected in ((16, False), (15, True), (3, True), (0, True), (-1, False)):
+            target = self.today + dt.timedelta(days=days)
+            self._dates(target, target)
+            self.assertEqual(bool(self._fin().approaching), expected, days)
+        self._dates(self.today + dt.timedelta(days=5), self.today + dt.timedelta(days=5))
+        w = self._fin().approaching[0]
+        self.assertEqual(w.text, f"Substantial performance target {w.target} is in 5 days")
+        self.assertFalse(self._fin().pccf_required)                  # a separate category from PCCF required
+        ProjectStatus.objects.filter(project=self.p).update(actual_substantial=self.today)
+        self.assertFalse(self._fin().approaching)                    # already achieved
+
+    def test_approaching_shown_on_dashboards(self):
+        self._dates(self.today + dt.timedelta(days=7), self.today + dt.timedelta(days=7))
+        r = self.client.get("/")
+        self.assertEqual(len(r.context["approaching"]), 1)
+        self.assertContains(r, "Approaching target dates")
+        self.assertContains(self.client.get(f"/mpsr/{self.p.pk}/"), "Approaching target date")
+        self.assertContains(self.client.get("/mpsr/"), "⏱ 7d")
+        r = self.client.get("/projects/?show=approaching")
+        self.assertEqual([f.project.pk for f in r.context["rows"]], [self.p.pk])
+
+
 class PCCFRequiredTests(Base):
     """Base project: approved PCCF 0 has Q1 1,000 + Q2 2,000 this year; the forecast has Q1 10 + Q2 20."""
 

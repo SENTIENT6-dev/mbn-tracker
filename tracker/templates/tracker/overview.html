@@ -22,6 +22,10 @@
     <div class="d">forecast passed, no actual date</div></a>
   <a class="tile {% if pccf_count %}warn{% endif %}" href="/projects/?show=pccf"><div class="k">PCCF required</div><div class="v">{{ pccf_count }}</div>
     <div class="d">forecast differs from approved</div></a>
+  <a class="tile {% if approaching %}info{% endif %}" href="/projects/?show=approaching"><div class="k">Approaching targets</div><div class="v">{{ approaching|length }}</div>
+    <div class="d">approved date in the next 15 days</div></a>
+  <a class="tile {% if kpi_count %}alert{% endif %}" href="/projects/?show=kpi"><div class="k">KPI failures</div><div class="v">{{ kpi_count }}</div>
+    <div class="d">missed target dates recorded</div></a>
   <a class="tile" href="/change-orders/"><div class="k">Open change orders</div><div class="v">{{ open_cos }}</div>
     <div class="d">awaiting approval or processing</div></a>
   <a class="tile" href="/mpsr/"><div class="k">MPSR {{ today|date:"F" }}</div><div class="v">{{ mpsr_done }} / {{ rows|length }}</div>
@@ -97,6 +101,19 @@ Current forecast: {{ q.forecast|money }}"><div class="b a" style="height:{{ q.a_
           {% if f.pccf_required %}<div style="margin-top:3px"><span class="pill warn">⚠ PCCF required</span></div>{% endif %}
         </a>
       {% empty %}<p class="muted">Nothing over budget or overdue.</p>{% endfor %}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Approaching target dates</h2>{% if approaching %}<span class="pill blue">{{ approaching|length }}</span>{% endif %}</div>
+      {% for w, f in approaching %}
+        <div class="pccf-row">
+          <div style="width:46px;text-align:center;flex:none"><div style="font-size:19px;font-weight:650;line-height:1.1">{{ w.days }}</div>
+            <div style="font-size:11px;color:var(--ink-2)">day{{ w.days|pluralize }}</div></div>
+          <div style="min-width:0;flex:1"><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a>
+            <span class="ink2" style="font-size:12.5px">· {{ f.project.title|truncatechars:30 }}</span>
+            <div style="font-size:12.5px">{{ w.text }}</div></div>
+        </div>
+      {% empty %}<p class="muted">No approved target dates in the next 15 days.</p>{% endfor %}
     </div>
 
     <div class="panel">

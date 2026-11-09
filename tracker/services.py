@@ -8,7 +8,8 @@ from decimal import Decimal
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import PCCF, ChangeOrder, Invoice, Project, ProjectStatus, PurchaseOrder, ValueOfWork
+from .models import (PCCF, ChangeOrder, Invoice, KPIFailure, Project, ProjectStatus, PurchaseOrder,
+                     ValueOfWork)
 
 ZERO = Decimal("0")
 CONSULTANT, CONTRACTOR = "Consultant", "Contractor"
@@ -21,7 +22,8 @@ CONSULTANT, CONTRACTOR = "Consultant", "Contractor"
 # brought back in line.
 
 CASH_TOLERANCE = Decimal("1")      # cents of rounding don't need a PCCF
-PCCF_DATES = [("design_end", "Design end"), ("substantial", "Substantial performance")]
+PCCF_DATES = [("design_end", "Design end"), ("substantial", "Substantial performance")]   # the KPI target dates
+APPROACHING_DAYS = 15              # warn this many days before an approved target date
 
 
 @dataclass
@@ -34,6 +36,11 @@ class PCCFReason:
     @property
     def is_cash(self):
         return self.key == "cash"
+
+    @property
+    def target_passed(self):
+        """A missed target date: IO won't move it with a PCCF any more, so it can be marked a KPI failure."""
+        return not self.is_cash and self.approved < timezone.localdate()
 
     @property
     def difference(self):
@@ -65,10 +72,18 @@ def approved_cash_for_year(pccf, fiscal_year):
     return None
 
 
-def pccf_reasons(project, pccf, status):
-    """Why a new PCCF is needed (empty list = not needed). Only for projects still being reported on."""
-    if pccf is None or status is None or project.status not in (Project.Status.ACTIVE, Project.Status.ON_HOLD):
+def _reporting(project):
+    return project.status in (Project.Status.ACTIVE, Project.Status.ON_HOLD)
+
+
+def pccf_reasons(project, pccf, status, kpi_failures=()):
+    """Why a new PCCF is needed (empty list = not needed). Only for projects still being reported on.
+
+    A target date already recorded as a KPI failure (same milestone, same approved date) no longer asks for one.
+    """
+    if pccf is None or status is None or not _reporting(project):
         return []
+    failed = {(k.milestone, k.target) for k in kpi_failures}
     out = []
     approved = approved_cash_for_year(pccf, status.fiscal_year)
     forecast = status.current_year_forecast
@@ -77,8 +92,38 @@ def pccf_reasons(project, pccf, status):
         out.append(PCCFReason("cash", f"FY {fy} cash flow" if fy else "This year's cash flow", approved, forecast))
     for field, label in PCCF_DATES:
         a, f = getattr(pccf, field), getattr(status, field)
-        if a and f and a != f:
+        if a and f and a != f and (field, a) not in failed:
             out.append(PCCFReason(field, label, a, f))
+    return out
+
+
+@dataclass
+class TargetWarning:
+    """An approved target date coming up within APPROACHING_DAYS, with the milestone not done yet."""
+    key: str
+    label: str
+    target: object
+    forecast: object
+    days: int
+
+    @property
+    def text(self):
+        when = "today" if self.days == 0 else f"in {self.days} day{'s' if self.days != 1 else ''}"
+        fc = f" · forecast {self.forecast}" if self.forecast and self.forecast != self.target else ""
+        return f"{self.label} target {self.target} is {when}{fc}"
+
+
+def approaching_targets(project, pccf, status, today=None):
+    if pccf is None or not _reporting(project):
+        return []
+    today = today or timezone.localdate()
+    out = []
+    for field, label in PCCF_DATES:
+        target = getattr(pccf, field)
+        done = getattr(status, f"actual_{field}", None) if status else None
+        if target and not done and 0 <= (target - today).days <= APPROACHING_DAYS:
+            out.append(TargetWarning(field, label, target, getattr(status, field, None) if status else None,
+                                     (target - today).days))
     return out
 
 
@@ -110,12 +155,19 @@ class Financials:
     contractor_commitments: Decimal = ZERO
     pending: Decimal = ZERO
     invoiced: Decimal = ZERO
+    kpi_failures: list = field(default_factory=list)
 
     @property
     def pccf_reasons(self):
         if not hasattr(self, "_pccf_reasons"):
-            self._pccf_reasons = pccf_reasons(self.project, self.pccf, self.status)
+            self._pccf_reasons = pccf_reasons(self.project, self.pccf, self.status, self.kpi_failures)
         return self._pccf_reasons
+
+    @property
+    def approaching(self):
+        if not hasattr(self, "_approaching"):
+            self._approaching = approaching_targets(self.project, self.pccf, self.status)
+        return self._approaching
 
     @property
     def pccf_required(self):
@@ -269,6 +321,9 @@ def financials(projects):
     for v in ValueOfWork.objects.filter(project_id__in=ids).order_by("project_id", "reporting_date"):
         vows[v.project_id] = v
     statuses = {s.project_id: s for s in ProjectStatus.objects.filter(project_id__in=ids)}
+    kpis = {}
+    for k in KPIFailure.objects.filter(project_id__in=ids):
+        kpis.setdefault(k.project_id, []).append(k)
 
     pos =PurchaseOrder.objects.filter(project_id__in=ids)
     commit = _sum_by(pos, "project_id", "amount")
@@ -279,6 +334,7 @@ def financials(projects):
     invoiced = _sum_by(Invoice.objects.filter(po__project_id__in=ids), "po__project_id", "amount")
 
     return [Financials(project=p, pccf=latest.get(p.id), vow=vows.get(p.id), status=statuses.get(p.id),
+                       kpi_failures=kpis.get(p.id, []),
                        commitments=commit.get(p.id, ZERO), consultant_commitments=consult.get(p.id, ZERO),
                        contractor_commitments=contract.get(p.id, ZERO), pending=pending.get(p.id, ZERO),
                        invoiced=invoiced.get(p.id, ZERO))

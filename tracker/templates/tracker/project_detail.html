@@ -44,10 +44,11 @@
       <span>· {% if project.building %}<a href="/facilities/buildings/{{ project.building_id }}/">{{ project.building }}</a>{% else %}Building {{ project.building_code|default:"–" }}{% endif %}</span>    </div>
   </div>
   <span class="spacer"></span>
-  <a class="btn ghost-danger" href="/projects/{{ project.pk }}/delete/">Delete</a>
   <a class="btn" href="/projects/{{ project.pk }}/edit/">Edit details</a>
   <a class="btn" href="/projects/{{ project.pk }}/pccf/new/">+ PCCF</a>
   <a class="btn primary" href="/pos/new/?project={{ project.pk }}">+ PO</a>
+  <details class="more-menu"><summary class="btn" aria-label="More actions" title="More actions">⋯</summary>
+    <div class="menu"><a class="danger" href="/projects/{{ project.pk }}/delete/">Delete project…</a></div></details>
 </div>
 
 {% if stepper %}

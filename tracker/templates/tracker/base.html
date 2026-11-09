@@ -77,6 +77,20 @@ a.tile:hover{text-decoration:none;border-color:var(--accent)}
 .tile.alert .v{color:var(--crit-ink)}
 .tile.warn .v{color:var(--warn-ink)}
 .tile.info .v{color:var(--accent-ink)}
+.tile.clear .v{color:var(--good-ink)}
+.more-menu{position:relative}
+.more-menu>summary.btn{list-style:none;padding-left:12px;padding-right:12px}
+.more-menu>summary.btn::before{content:none}
+.more-menu>summary::-webkit-details-marker{display:none}
+.more-menu .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:180px;padding:6px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--ring);box-shadow:0 10px 30px rgba(0,0,0,.15)}
+.more-menu .menu a{display:block;padding:8px 10px;border-radius:7px;color:var(--ink)}
+.more-menu .menu a:hover{background:var(--surface-2);text-decoration:none}
+.more-menu .menu a.danger{color:var(--crit-ink)}
+h2.tiles-head{font-size:12px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin:4px 0 8px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));align-items:start}
+.action-panels{margin-bottom:22px}
+.action-panels .panel{max-height:430px;overflow:auto}
 /* ---------- tables */
 table{width:100%;border-collapse:collapse}
 th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
@@ -598,6 +612,11 @@ document.addEventListener('click', e => {
     delete b.dataset.armed; b.textContent = b.dataset.label; b.classList.remove('armed');
   }, 5000);
 });
+
+// "⋯ More" menus close when you click anywhere else
+document.addEventListener('click', e => document.querySelectorAll('details.more-menu[open]').forEach(d => {
+  if (!d.contains(e.target)) d.open = false;
+}));
 
 // Money boxes: shown as 1,234,567.89. Read them with moneyVal(), never parseFloat (commas!).
 window.moneyVal = el => {

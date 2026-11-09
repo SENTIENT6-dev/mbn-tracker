@@ -10,6 +10,67 @@
 {% include "tracker/_rollover_banner.html" %}
 {% if open_issues %}<div class="banner">{{ open_issues }} data issue{{ open_issues|pluralize }} need{{ open_issues|pluralize:"s," }} a decision. <a href="/issues/">Review</a></div>{% endif %}
 
+{# ---- what needs doing: first #}
+<h2 class="tiles-head">Needs action</h2>
+<div class="tiles">
+  <a class="tile {% if pccf_count %}warn{% else %}clear{% endif %}" href="/projects/?show=pccf"><div class="k">PCCF required</div><div class="v">{{ pccf_count }}</div>
+    <div class="d">forecast differs from approved</div></a>
+  <a class="tile {% if kpi_issue_count %}alert{% else %}clear{% endif %}" href="/projects/?show=kpi_issue"><div class="k">KPI issues</div><div class="v">{{ kpi_issue_count }}</div>
+    <div class="d">missed targets to review</div></a>
+  <a class="tile {% if approaching %}info{% else %}clear{% endif %}" href="/projects/?show=approaching"><div class="k">Approaching targets</div><div class="v">{{ approaching|length }}</div>
+    <div class="d">approved date in the next 15 days</div></a>
+  <a class="tile {% if overdue_count %}alert{% else %}clear{% endif %}" href="/calendar/"><div class="k">Overdue milestones</div><div class="v">{{ overdue_count }}</div>
+    <div class="d">forecast passed, no actual date</div></a>
+  <a class="tile {% if not open_cos %}clear{% endif %}" href="/change-orders/"><div class="k">Open change orders</div><div class="v">{{ open_cos }}</div>
+    <div class="d">awaiting approval or processing</div></a>
+  <a class="tile {% if mpsr_done == rows|length and rows %}clear{% endif %}" href="/mpsr/"><div class="k">MPSR {{ today|date:"F" }}</div><div class="v">{{ mpsr_done }} / {{ rows|length }}</div>
+    <div class="d">{% if mpsr_done == rows|length and rows %}✓ all projects done{% else %}projects done · open MPSR mode{% endif %}</div></a>
+</div>
+
+<div class="grid g3 action-panels">
+  <div class="panel">
+    <div class="panel-head"><h2>Needs attention</h2>{% if attention %}<span class="pill over">{{ attention|length }}</span>{% endif %}</div>
+    {% for f in attention %}
+      <a href="/projects/{{ f.project.pk }}/" style="display:block;color:inherit;padding:9px 0;border-bottom:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between;gap:8px"><strong>{{ f.project.io_number }}</strong>
+          <span>{% include "tracker/_health.html" with f=f %}</span></div>
+        <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:44 }}
+          {% if f.budget_health == 'over' %} · over by {{ f.remaining_budget|abs|money }}{% endif %}</div>
+        {% if f.pccf_required %}<div style="margin-top:3px"><span class="pill warn">⚠ PCCF required</span></div>{% endif %}
+      </a>
+    {% empty %}<p class="muted">Nothing over budget or overdue.</p>{% endfor %}
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>PCCFs required</h2>{% if pccf_count %}<span class="pill warn">{{ pccf_count }}</span>{% endif %}<span class="spacer"></span>
+      {% if pccf_count %}<a href="/projects/?show=pccf">All →</a>{% endif %}</div>
+    {% for f in pccf_rows %}
+      <div class="pccf-row">
+        <div style="min-width:0;flex:1"><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a>
+          <span class="ink2" style="font-size:12.5px">· {{ f.project.title|truncatechars:30 }}</span>
+          <ul>{% for r in f.pccf_reasons %}<li>{{ r.text }}</li>{% endfor %}</ul></div>
+        <a class="btn small" href="/projects/{{ f.project.pk }}/pccf/new/?from=forecast" title="New PCCF prefilled from the forecast">Start PCCF</a>
+      </div>
+    {% empty %}<p class="muted">Every forecast matches its approved PCCF.</p>{% endfor %}
+    {% if pccf_count > pccf_rows|length %}<p style="margin:8px 0 0;font-size:12.5px"><a href="/projects/?show=pccf">{{ pccf_count }} in total. See all →</a></p>{% endif %}
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>Approaching target dates</h2>{% if approaching %}<span class="pill blue">{{ approaching|length }}</span>{% endif %}</div>
+    {% for w, f in approaching %}
+      <div class="pccf-row">
+        <div style="width:46px;text-align:center;flex:none"><div style="font-size:19px;font-weight:650;line-height:1.1">{{ w.days }}</div>
+          <div style="font-size:11px;color:var(--ink-2)">day{{ w.days|pluralize }}</div></div>
+        <div style="min-width:0;flex:1"><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a>
+          <span class="ink2" style="font-size:12.5px">· {{ f.project.title|truncatechars:30 }}</span>
+          <div style="font-size:12.5px">{{ w.text }}</div></div>
+      </div>
+    {% empty %}<p class="muted">No approved target dates in the next 15 days.</p>{% endfor %}
+  </div>
+</div>
+
+{# ---- the portfolio: reference figures and charts #}
+<h2 class="tiles-head">Portfolio</h2>
 <div class="tiles">
   <a class="tile" href="/projects/"><div class="k">Active projects</div><div class="v">{{ rows|length }}</div>
     <div class="d">{{ totals.budget_with_fee|money }} total budget incl. fee</div></a>
@@ -19,20 +80,8 @@
     <div class="d">{{ invoiced_pct|floatformat:0 }}% of budget · VOW {{ totals.vow_total|money }}</div></div>
   <a class="tile" href="/calendar/"><div class="k">Milestones, next 90 days</div><div class="v">{{ upcoming_count }}</div>
     <div class="d">on the calendar</div></a>
-  <a class="tile {% if overdue_count %}alert{% endif %}" href="/calendar/"><div class="k">Overdue milestones</div><div class="v">{{ overdue_count }}</div>
-    <div class="d">forecast passed, no actual date</div></a>
-  <a class="tile {% if pccf_count %}warn{% endif %}" href="/projects/?show=pccf"><div class="k">PCCF required</div><div class="v">{{ pccf_count }}</div>
-    <div class="d">forecast differs from approved</div></a>
-  <a class="tile {% if approaching %}info{% endif %}" href="/projects/?show=approaching"><div class="k">Approaching targets</div><div class="v">{{ approaching|length }}</div>
-    <div class="d">approved date in the next 15 days</div></a>
-  <a class="tile {% if kpi_issue_count %}alert{% endif %}" href="/projects/?show=kpi_issue"><div class="k">KPI issues</div><div class="v">{{ kpi_issue_count }}</div>
-    <div class="d">missed targets to review</div></a>
   <a class="tile" href="/projects/?show=kpi"><div class="k">KPI failures</div><div class="v">{{ kpi_count }}</div>
     <div class="d">officially recorded, with reasons</div></a>
-  <a class="tile" href="/change-orders/"><div class="k">Open change orders</div><div class="v">{{ open_cos }}</div>
-    <div class="d">awaiting approval or processing</div></a>
-  <a class="tile" href="/mpsr/"><div class="k">MPSR {{ today|date:"F" }}</div><div class="v">{{ mpsr_done }} / {{ rows|length }}</div>
-    <div class="d">{% if mpsr_done == rows|length and rows %}✓ all projects done{% else %}projects done · open MPSR mode{% endif %}</div></a>
 </div>
 
 <div class="grid g-main">
@@ -94,46 +143,6 @@ Current forecast: {{ q.forecast|money }}"><div class="b a" style="height:{{ q.a_
   </div>
 
   <div>
-    <div class="panel">
-      <div class="panel-head"><h2>Needs attention</h2></div>
-      {% for f in attention %}
-        <a href="/projects/{{ f.project.pk }}/" style="display:block;color:inherit;padding:9px 0;border-bottom:1px solid var(--line)">
-          <div style="display:flex;justify-content:space-between;gap:8px"><strong>{{ f.project.io_number }}</strong>
-            <span>{% include "tracker/_health.html" with f=f %}</span></div>
-          <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:44 }}
-            {% if f.budget_health == 'over' %} · over by {{ f.remaining_budget|abs|money }}{% endif %}</div>
-          {% if f.pccf_required %}<div style="margin-top:3px"><span class="pill warn">⚠ PCCF required</span></div>{% endif %}
-        </a>
-      {% empty %}<p class="muted">Nothing over budget or overdue.</p>{% endfor %}
-    </div>
-
-    <div class="panel">
-      <div class="panel-head"><h2>Approaching target dates</h2>{% if approaching %}<span class="pill blue">{{ approaching|length }}</span>{% endif %}</div>
-      {% for w, f in approaching %}
-        <div class="pccf-row">
-          <div style="width:46px;text-align:center;flex:none"><div style="font-size:19px;font-weight:650;line-height:1.1">{{ w.days }}</div>
-            <div style="font-size:11px;color:var(--ink-2)">day{{ w.days|pluralize }}</div></div>
-          <div style="min-width:0;flex:1"><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a>
-            <span class="ink2" style="font-size:12.5px">· {{ f.project.title|truncatechars:30 }}</span>
-            <div style="font-size:12.5px">{{ w.text }}</div></div>
-        </div>
-      {% empty %}<p class="muted">No approved target dates in the next 15 days.</p>{% endfor %}
-    </div>
-
-    <div class="panel">
-      <div class="panel-head"><h2>PCCFs required</h2>{% if pccf_count %}<span class="pill warn">{{ pccf_count }}</span>{% endif %}<span class="spacer"></span>
-        {% if pccf_count %}<a href="/projects/?show=pccf">All →</a>{% endif %}</div>
-      {% for f in pccf_rows %}
-        <div class="pccf-row">
-          <div style="min-width:0;flex:1"><a href="/projects/{{ f.project.pk }}/"><strong>{{ f.project.io_number }}</strong></a>
-            <span class="ink2" style="font-size:12.5px">· {{ f.project.title|truncatechars:30 }}</span>
-            <ul>{% for r in f.pccf_reasons %}<li>{{ r.text }}</li>{% endfor %}</ul></div>
-          <a class="btn small" href="/projects/{{ f.project.pk }}/pccf/new/?from=forecast" title="New PCCF prefilled from the forecast">Start PCCF</a>
-        </div>
-      {% empty %}<p class="muted">Every forecast matches its approved PCCF.</p>{% endfor %}
-      {% if pccf_count > pccf_rows|length %}<p style="margin:8px 0 0;font-size:12.5px"><a href="/projects/?show=pccf">{{ pccf_count }} in total. See all →</a></p>{% endif %}
-    </div>
-
     <div class="panel">
       <div class="panel-head"><h2>Upcoming milestones</h2><span class="spacer"></span><a href="/calendar/">Calendar →</a></div>
       {% for e in upcoming %}

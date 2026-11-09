@@ -14,7 +14,7 @@ from django.utils import timezone
 from . import forms as F
 from .models import MPSRReview, Project, ProjectStatus, StatusHistory, ValueOfWork
 from .textutil import current_fiscal_year, fiscal_label
-from .services import (approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, milestones,
+from .services import (PCCF_DATES, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, milestones,
                        pccf_flag_message, project_financials)
 
 ZERO = Decimal("0")
@@ -78,6 +78,19 @@ def _forms(status, fin, data=None):
         "cash": F.CashFlowForm(data, instance=status, prefix="cash"),
         "vow": F.VOWForm(data, prefix="vow", initial=vow_initial),
     }
+
+
+def _date_fields(form, fin):
+    """Each forecast date box with its approved (PCCF) date. Design end and substantial are the KPI target dates
+    that need a PCCF when the forecast moves; `kpi` = that target is already recorded as a KPI failure."""
+    targets = {key for key, _ in PCCF_DATES}
+    failed = {(k.milestone, k.target) for k in fin.kpi_failures}
+    out = []
+    for bound in form:
+        approved = getattr(fin.pccf, bound.name, None) if fin.pccf else None
+        out.append({"field": bound, "approved": approved, "target": bound.name in targets,
+                    "kpi": (bound.name, approved) in failed})
+    return out
 
 
 def _jsonable(form):
@@ -197,6 +210,7 @@ def mpsr_project(request, pk):
         "forecast_total": forecast_total, "forecast_variance": forecast_total - fin.budget_with_fee,
         "flagged": flagged_keys(fin), "current_fy": current_fiscal_year(today),
         "ap": approved_for_year(fin.pccf, status.fiscal_year),
+        "date_fields": _date_fields(forms["dates"], fin), "today": today,
         "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year)
         if fin.pccf and not forecast_is_stale(status) else None,
         "done_count": len(done & set(order))})

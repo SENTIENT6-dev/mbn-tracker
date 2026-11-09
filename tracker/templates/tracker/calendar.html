@@ -72,8 +72,9 @@
                data-tip="{{ e.label }} — {{ e.project.io_number }}
 {{ e.project.title }}
 {% if e.done %}✓ Actual {{ e.actual }}{% elif e.is_deadline %}Deadline {{ e.forecast }} (design end + 30 days){% elif e.forecast %}Forecast {{ e.forecast }}{% else %}Approved {{ e.approved }} (no forecast){% endif %}{% if e.approved %}
-Approved (PCCF): {{ e.approved }}{% endif %}{% if e.slip_days %}
-{% if e.slip_days > 0 %}{{ e.slip_days }} days later than approved{% else %}{% widthratio e.slip_days 1 -1 %} days earlier than approved{% endif %}{% endif %}{% if e.css == 'missed' %}
+Approved (PCCF): {{ e.approved }}{% endif %}{% if e.is_target %}
+{{ e.target_text }}{% elif e.vs_approved %}
+{{ e.vs_approved|capfirst }}{% endif %}{% if e.css == 'missed' %}
 ✗ No actual date recorded{% endif %}">
               <span class="st">{% if e.css == 'done' %}✓{% elif e.css == 'missed' %}✗{% else %}●{% endif %}</span>
               <span>{{ e.project.io_number }}</span><span class="t ink2">{{ e.label }}</span>

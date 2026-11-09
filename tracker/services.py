@@ -39,7 +39,7 @@ class PCCFReason:
 
     @property
     def target_passed(self):
-        """A missed target date: IO won't move it with a PCCF any more, so it can be marked a KPI failure."""
+        """A missed target date: IO won't move it with a PCCF any more (it's a KPI issue instead)."""
         return not self.is_cash and self.approved < timezone.localdate()
 
     @property
@@ -56,8 +56,10 @@ class PCCFReason:
             sign = "+" if d > 0 else "−"
             return (f"{self.label}: forecast ${self.forecast:,.0f} vs approved ${self.approved:,.0f} "
                     f"({sign}${abs(d):,.0f})")
-        return (f"{self.label}: forecast {self.forecast} vs approved {self.approved} "
-                f"({abs(d)} day{'s' if abs(d) != 1 else ''} {'later' if d > 0 else 'earlier'})")
+        # a target date is pass/fail: what matters is whether it can still be changed, not by how many days
+        when = ("target has passed" if self.target_passed
+                else f"submit a PCCF before {self.approved} to change the target")
+        return f"{self.label}: forecast {self.forecast} vs approved target {self.approved} ({when})"
 
 
 def approved_for_year(pccf, fiscal_year):
@@ -123,8 +125,40 @@ def pccf_reasons(project, pccf, status, kpi_failures=()):
         out.append(PCCFReason("cash", f"FY {fy} cash flow" if fy else "This year's cash flow", approved, forecast))
     for field, label in PCCF_DATES:
         a, f = getattr(pccf, field), getattr(status, field)
-        if a and f and a != f and (field, a) not in failed:
+        achieved = getattr(status, f"actual_{field}")   # once it's happened, the forecast no longer matters
+        if a and f and a != f and not achieved and (field, a) not in failed:
             out.append(PCCFReason(field, label, a, f))
+    return out
+
+
+@dataclass
+class KPIIssue:
+    """A target date that was missed: achieved after it, or passed without being achieved. It stays an issue
+    until the PM officially records it as a KPI failure (with a reason)."""
+    key: str
+    label: str
+    target: object
+    actual: object
+    forecast: object
+
+    @property
+    def text(self):
+        how = f"achieved {self.actual}" if self.actual else "passed without being achieved"
+        return f"{self.label} target {self.target} missed ({how})"
+
+
+def kpi_issues(project, pccf, status, kpi_failures=(), today=None):
+    if pccf is None or status is None or not _reporting(project):
+        return []
+    today = today or timezone.localdate()
+    failed = {(k.milestone, k.target) for k in kpi_failures}
+    out = []
+    for field, label in PCCF_DATES:
+        target, actual = getattr(pccf, field), getattr(status, f"actual_{field}")
+        if not target or (field, target) in failed:
+            continue
+        if (actual and actual > target) or (not actual and target < today):
+            out.append(KPIIssue(field, label, target, actual, getattr(status, field)))
     return out
 
 
@@ -194,6 +228,12 @@ class Financials:
         if not hasattr(self, "_pccf_reasons"):
             self._pccf_reasons = pccf_reasons(self.project, self.pccf, self.status, self.kpi_failures)
         return self._pccf_reasons
+
+    @property
+    def kpi_issues(self):
+        if not hasattr(self, "_kpi_issues"):
+            self._kpi_issues = kpi_issues(self.project, self.pccf, self.status, self.kpi_failures)
+        return self._kpi_issues
 
     @property
     def approaching(self):
@@ -517,6 +557,7 @@ def tender_deadline(status):
 
 
 CONSTRUCTION_PHASES = (Project.Phase.CONSTRUCTION, Project.Phase.FINANCIAL_CLOSE)
+TARGET_KEYS = {"design", "substantial"}   # milestone keys of the KPI target dates (PCCF_DATES)
 
 
 def _stage_reached(gate_name):
@@ -558,6 +599,7 @@ class Milestone:
     approved: object = None
     awarded: object = None  # tender only: construction award date, which means the tender already happened
     in_construction: bool = False  # tender only: the project has reached construction, so the tender happened
+    kpi_recorded: bool = False     # target dates only: this missed target is officially a KPI failure
 
     @property
     def is_deadline(self):
@@ -599,6 +641,37 @@ class Milestone:
             return (target - self.approved).days
         return None
 
+    @property
+    def is_target(self):
+        """Design end and substantial performance are KPI target dates (pass/fail against the PCCF)."""
+        return self.key in TARGET_KEYS and self.approved is not None
+
+    @property
+    def target_result(self):
+        """met / missed / pccf (still ahead, forecast differs: a PCCF can change it) / on_track; None if no target."""
+        if not self.is_target:
+            return None
+        if self.actual:
+            return "met" if self.actual <= self.approved else "missed"
+        if self.approved < timezone.localdate():
+            return "missed"
+        if self.forecast and self.forecast != self.approved:
+            return "pccf"
+        return "on_track"
+
+    @property
+    def target_text(self):
+        missed = "✗ Target missed · KPI failure recorded" if self.kpi_recorded else "✗ Target missed: KPI issue"
+        return {"met": "✓ Target met", "missed": missed,
+                "pccf": f"⚠ Differs from target: PCCF needed before {self.approved}",
+                "on_track": "On track for target"}.get(self.target_result, "")
+
+    @property
+    def vs_approved(self):
+        """For other milestones: later / earlier than the approved date, or '' (no day counts)."""
+        d = self.slip_days
+        return "" if not d else ("later than approved" if d > 0 else "earlier than approved")
+
 
 def milestones(projects):
     """Every milestone of the given projects, from the MPSR status and latest PCCF."""
@@ -612,7 +685,9 @@ def milestones(projects):
             approved = getattr(f.pccf, ap, None) if f.pccf else None
             date = actual or forecast or approved
             if date:
-                events.append(Milestone(f.project, key, label, date, forecast, actual, approved))
+                recorded = any(k.milestone == ap and k.target == approved for k in f.kpi_failures)
+                events.append(Milestone(f.project, key, label, date, forecast, actual, approved,
+                                        kpi_recorded=recorded))
         due = tender_deadline(st)
         if due:
             events.append(Milestone(f.project, "tender", "Go to tender", st.actual_tender or due,

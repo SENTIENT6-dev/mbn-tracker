@@ -19,21 +19,28 @@
 <div class="pccf-flag" role="status">
   <div class="what">
     <strong>⚠ PCCF required: the forecast no longer matches approved PCCF {{ fin.pccf.submission }}</strong>
-    <ul>{% for r in fin.pccf_reasons %}<li>{{ r.text }}
-      {% if r.target_passed %}
-        <details class="kpi-mark"><summary>Target has passed. Mark as KPI failure</summary>
-          <form method="post" action="/projects/{{ fin.project.pk }}/kpi/{{ r.key }}/mark/">{% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <p>IO doesn't move a target date once it has passed. Recording a KPI failure keeps the missed target
-              ({{ r.approved }}) on file and stops this date from asking for a PCCF.</p>
-            <input name="note" maxlength="500" placeholder="Reason (optional)">
-            <button class="btn small danger">Confirm KPI failure</button>
-          </form>
-        </details>
-      {% endif %}</li>{% endfor %}</ul>
+    <ul>{% for r in fin.pccf_reasons %}<li>{{ r.text }}{% if r.target_passed %} · see KPI issues below{% endif %}</li>{% endfor %}</ul>
     <div style="font-size:12.5px;margin-top:5px">This clears once a new PCCF approves these values, or the forecast is changed back to match.</div>
   </div>
   <a class="btn primary" href="/projects/{{ fin.project.pk }}/pccf/new/?from=forecast">Start PCCF from forecast</a>
+</div>
+{% endif %}
+{% if fin.kpi_issues %}
+<div class="kpi-issues" role="status">
+  <strong>⚑ KPI issue{{ fin.kpi_issues|pluralize }}: target date{{ fin.kpi_issues|pluralize }} missed</strong>
+  {% for i in fin.kpi_issues %}
+  <div class="kpi-item"><span>{{ i.text }}</span>
+    <details class="kpi-mark" style="flex-basis:100%"><summary>Officially mark as a KPI failure</summary>
+      <form method="post" action="/projects/{{ fin.project.pk }}/kpi/{{ i.key }}/mark/">{% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <p>IO doesn't move a target date once it has passed. Recording the failure keeps the missed target
+          ({{ i.target }}) on file with the reason{% if i.forecast and not i.actual %} and stops this date asking for a PCCF{% endif %}.</p>
+        <input name="note" maxlength="500" required placeholder="Reason the target was missed (required)">
+        <button class="btn small danger">Record KPI failure</button>
+      </form>
+    </details>
+  </div>
+  {% endfor %}
 </div>
 {% endif %}
 {% if fin.kpi_failures %}
@@ -41,7 +48,7 @@
   <strong>KPI failures</strong>
   {% for k in fin.kpi_failures %}
   <div class="kpi-item"><span class="pill crit">✗ {{ k.get_milestone_display }}</span>
-    <span>target {{ k.target }}{% if k.forecast %} · forecast {{ k.forecast }}{% endif %} · marked {{ k.marked_at|date:"Y-m-d" }}{% if k.note %} · {{ k.note }}{% endif %}</span>
+    <span>target {{ k.target }}{% if k.forecast %} · date at the time {{ k.forecast }}{% endif %} · recorded {{ k.marked_at|date:"Y-m-d" }}{% if k.note %} · {{ k.note }}{% endif %}</span>
     <form method="post" action="/projects/{{ fin.project.pk }}/kpi/{{ k.pk }}/undo/" style="margin:0 0 0 auto">{% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="linkbtn">Remove</button></form>
   </div>

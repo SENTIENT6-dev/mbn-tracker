@@ -25,8 +25,10 @@
     <div class="d">forecast differs from approved</div></a>
   <a class="tile {% if approaching %}info{% endif %}" href="/projects/?show=approaching"><div class="k">Approaching targets</div><div class="v">{{ approaching|length }}</div>
     <div class="d">approved date in the next 15 days</div></a>
-  <a class="tile {% if kpi_count %}alert{% endif %}" href="/projects/?show=kpi"><div class="k">KPI failures</div><div class="v">{{ kpi_count }}</div>
-    <div class="d">missed target dates recorded</div></a>
+  <a class="tile {% if kpi_issue_count %}alert{% endif %}" href="/projects/?show=kpi_issue"><div class="k">KPI issues</div><div class="v">{{ kpi_issue_count }}</div>
+    <div class="d">missed targets to review</div></a>
+  <a class="tile" href="/projects/?show=kpi"><div class="k">KPI failures</div><div class="v">{{ kpi_count }}</div>
+    <div class="d">officially recorded, with reasons</div></a>
   <a class="tile" href="/change-orders/"><div class="k">Open change orders</div><div class="v">{{ open_cos }}</div>
     <div class="d">awaiting approval or processing</div></a>
   <a class="tile" href="/mpsr/"><div class="k">MPSR {{ today|date:"F" }}</div><div class="v">{{ mpsr_done }} / {{ rows|length }}</div>

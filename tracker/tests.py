@@ -1129,13 +1129,19 @@ class KPIAndApproachingTests(Base):
         self._dates(target, self.today + dt.timedelta(days=40))
         reason = self._fin().pccf_reasons[0]
         self.assertTrue(reason.target_passed)
+        f = self._fin()
+        self.assertEqual([i.key for i in f.kpi_issues], ["substantial"])   # missed target: a KPI issue
         r = self.client.get(f"/projects/{self.p.pk}/")
-        self.assertContains(r, "Mark as KPI failure")
+        self.assertContains(r, "Officially mark as a KPI failure")
+        r = self.client.post(f"/projects/{self.p.pk}/kpi/substantial/mark/", {"note": "  "}, follow=True)
+        self.assertContains(r, "give the reason")                     # reason is required
+        self.assertFalse(KPIFailure.objects.exists())
         r = self.client.post(f"/projects/{self.p.pk}/kpi/substantial/mark/",
                              {"note": "Permit delay", "next": f"/mpsr/{self.p.pk}/"}, follow=True)
         k = KPIFailure.objects.get()
         self.assertEqual((k.milestone, k.target, k.note), ("substantial", target, "Permit delay"))
         self.assertFalse(self._fin().pccf_required)                  # no longer asks for a PCCF
+        self.assertEqual(self._fin().kpi_issues, [])                  # issue became a failure
         self.assertContains(r, "recorded as a KPI failure")
         self.assertContains(r, f'action="/projects/{self.p.pk}/kpi/{k.pk}/undo/" class="msg-undo"')
         self.assertContains(r, "KPI failures")                      # listed on the page
@@ -1148,8 +1154,8 @@ class KPIAndApproachingTests(Base):
         from .models import KPIFailure
         self._dates(self.today + dt.timedelta(days=60), self.today + dt.timedelta(days=90))
         self.assertFalse(self._fin().pccf_reasons[0].target_passed)
-        self.assertNotContains(self.client.get(f"/projects/{self.p.pk}/"), "Mark as KPI failure")
-        r = self.client.post(f"/projects/{self.p.pk}/kpi/substantial/mark/", follow=True)
+        self.assertNotContains(self.client.get(f"/projects/{self.p.pk}/"), "Officially mark as a KPI failure")
+        r = self.client.post(f"/projects/{self.p.pk}/kpi/substantial/mark/", {"note": "x"}, follow=True)
         self.assertContains(r, "Not saved")
         self.assertFalse(KPIFailure.objects.exists())
 
@@ -1176,6 +1182,65 @@ class KPIAndApproachingTests(Base):
         self.assertFalse(self._fin().pccf_required)                  # a separate category from PCCF required
         ProjectStatus.objects.filter(project=self.p).update(actual_substantial=self.today)
         self.assertFalse(self._fin().approaching)                    # already achieved
+
+    def test_kpi_issues_detected(self):
+        past, future = self.today - dt.timedelta(days=10), self.today + dt.timedelta(days=60)
+
+        def issues(approved, forecast=None, actual=None):
+            PCCF.objects.filter(project=self.p).update(substantial=approved)
+            ProjectStatus.objects.filter(project=self.p).update(substantial=forecast, actual_substantial=actual)
+            return [i.text for i in self._fin().kpi_issues]
+
+        self.assertEqual(issues(past, actual=past), [])                       # met on the day
+        self.assertEqual(issues(past, actual=past + dt.timedelta(days=1)),
+                         [f"Substantial performance target {past} missed (achieved {past + dt.timedelta(days=1)})"])
+        self.assertEqual(issues(past, forecast=past),                          # passed, matching forecast too
+                         [f"Substantial performance target {past} missed (passed without being achieved)"])
+        self.assertEqual(issues(future, forecast=future + dt.timedelta(days=9)), [])   # still a PCCF matter
+        # once achieved, a different forecast no longer asks for a PCCF
+        issues(past, forecast=past + dt.timedelta(days=5), actual=past + dt.timedelta(days=5))
+        self.assertFalse(self._fin().pccf_required)
+        r = self.client.get("/")
+        self.assertEqual(r.context["kpi_issue_count"], 1)
+        self.assertContains(self.client.get("/projects/?show=kpi_issue"), "⚑ KPI issue")
+
+    def test_target_result_is_pass_fail(self):
+        from .services import milestones
+        past, future = self.today - dt.timedelta(days=10), self.today + dt.timedelta(days=60)
+
+        def result(approved, forecast=None, actual=None):
+            PCCF.objects.filter(project=self.p).update(substantial=approved)
+            ProjectStatus.objects.filter(project=self.p).update(substantial=forecast, actual_substantial=actual)
+            e = next(e for e in milestones([Project.objects.get(pk=self.p.pk)]) if e.key == "substantial")
+            return e.target_result
+
+        self.assertEqual(result(past, actual=past), "met")
+        self.assertEqual(result(past, actual=past - dt.timedelta(days=1)), "met")
+        self.assertEqual(result(past, actual=past + dt.timedelta(days=1)), "missed")   # one day late is a miss
+        self.assertEqual(result(past, forecast=past), "missed")                       # passed, not achieved
+        self.assertEqual(result(future, forecast=future), "on_track")
+        self.assertEqual(result(future, forecast=future + dt.timedelta(days=1)), "pccf")
+        r = self.client.get(f"/projects/{self.p.pk}/")
+        self.assertContains(r, f"PCCF needed before {future}")
+        self.assertNotContains(r, "days late vs approved")
+
+    def test_mpsr_forecast_dates_show_approved_and_kpi(self):
+        from .models import KPIFailure
+        target = self.today - dt.timedelta(days=10)
+        self._dates(target, self.today + dt.timedelta(days=40))
+        PCCF.objects.filter(project=self.p).update(closeout=dt.date(2028, 1, 31))
+        r = self.client.get(f"/mpsr/{self.p.pk}/")
+        rows = {d["field"].name: d for d in r.context["date_fields"]}
+        self.assertEqual(list(rows), ["design_end", "construction_award", "substantial", "closeout"])
+        self.assertEqual((rows["substantial"]["approved"], rows["substantial"]["target"], rows["substantial"]["kpi"]),
+                         (target, True, False))
+        self.assertFalse(rows["closeout"]["target"])                 # not a KPI target: info only
+        self.assertContains(r, f"Approved: {target} · target")
+        self.assertContains(r, "Approved: 2028-01-31<")
+        self.assertContains(r, "No approved date")                  # construction award has none
+        KPIFailure.objects.create(project=self.p, milestone="substantial", target=target)
+        r = self.client.get(f"/mpsr/{self.p.pk}/")
+        self.assertTrue({d["field"].name: d for d in r.context["date_fields"]}["substantial"]["kpi"])
 
     def test_approaching_shown_on_dashboards(self):
         self._dates(self.today + dt.timedelta(days=7), self.today + dt.timedelta(days=7))
@@ -1218,7 +1283,8 @@ class PCCFRequiredTests(Base):
         PCCF.objects.filter(project=self.p).update(design_end=dt.date(2026, 6, 1), substantial=dt.date(2027, 1, 30))
         f = self._fin()
         self.assertEqual([r.key for r in f.pccf_reasons], ["substantial"])
-        self.assertIn("30 days later", f.pccf_reasons[0].text)
+        self.assertIn("approved target 2027-01-30 (submit a PCCF before 2027-01-30", f.pccf_reasons[0].text)
+        self.assertNotIn("days", f.pccf_reasons[0].text)               # pass/fail: no day counts
         self._status(substantial=dt.date(2027, 1, 30))
         self.assertFalse(self._fin().pccf_required)
 

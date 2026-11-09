@@ -105,7 +105,7 @@
           <small>30 days after design end {{ status.actual_design_end }}{% if t.e.late_days %} · <span class="neg">{{ t.e.late_days }} day{{ t.e.late_days|pluralize }} late</span>{% endif %}</small>
           <div style="margin-top:4px">{% include "tracker/_tender_tick.html" with e=t.e next=request.get_full_path %}</div></div>
         {% else %}
-        <div class="name">{{ t.e.label }}<small>{% if t.e.done %}<span style="color:var(--good-ink);font-weight:700">✓</span> done {{ t.e.actual }}{% elif t.e.css == 'missed' %}<span style="color:var(--crit-ink);font-weight:700">✗</span> no actual date (due {{ t.e.date }}){% else %}due {{ t.e.date }}{% endif %}</small>{% if t.e.slip_days %}<small>{% if t.e.slip_days > 0 %}{{ t.e.slip_days }} days late vs approved{% else %}{% widthratio t.e.slip_days 1 -1 %} days early vs approved{% endif %}</small>{% endif %}</div>
+        <div class="name">{{ t.e.label }}<small>{% if t.e.done %}<span style="color:var(--good-ink);font-weight:700">✓</span> done {{ t.e.actual }}{% elif t.e.css == 'missed' %}<span style="color:var(--crit-ink);font-weight:700">✗</span> no actual date (due {{ t.e.date }}){% else %}due {{ t.e.date }}{% endif %}</small>{% if t.e.is_target %}<small class="tgt {{ t.e.target_result }}">{{ t.e.target_text }}</small>{% elif t.e.vs_approved %}<small>{{ t.e.vs_approved|capfirst }}</small>{% endif %}</div>
         {% endif %}
         <div class="lane">
           {% if t.link_width %}<div class="link" style="left:{{ t.link_left|floatformat:"2u" }}%;width:{{ t.link_width|floatformat:"2u" }}%"></div>{% endif %}

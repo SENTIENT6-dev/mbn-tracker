@@ -104,12 +104,15 @@
       </div>
     </div>
     <div class="panel">
-      <div class="panel-head"><h2>4 · Forecast dates</h2></div>
+      <div class="panel-head"><h2>4 · Forecast dates</h2>{% if fin.pccf %}<span class="spacer"></span><span class="muted" style="font-size:12px">Approved dates from PCCF {{ fin.pccf.submission }}</span>{% endif %}</div>
       <div class="mpsr-row">
-        <p>{{ f.dates.design_end.label_tag }}{{ f.dates.design_end }}{{ f.dates.design_end.errors }}</p>
-        <p>{{ f.dates.construction_award.label_tag }}{{ f.dates.construction_award }}{{ f.dates.construction_award.errors }}</p>
-        <p>{{ f.dates.substantial.label_tag }}{{ f.dates.substantial }}{{ f.dates.substantial.errors }}</p>
-        <p>{{ f.dates.closeout.label_tag }}{{ f.dates.closeout }}{{ f.dates.closeout.errors }}</p>
+        {% for d in date_fields %}
+        <p class="date-check" data-approved="{{ d.approved|date:'Y-m-d' }}" data-target="{{ d.target|yesno:'1,' }}" data-kpi="{{ d.kpi|yesno:'1,' }}"
+           data-actual="act-actual_{{ d.field.name }}" data-today="{{ today|date:'Y-m-d' }}">
+          {{ d.field.label_tag }}{{ d.field }}
+          <span class="helptext">{% if d.approved %}Approved: {{ d.approved }}{% if d.target %} · target{% endif %}{% else %}No approved date{% endif %}</span>
+          <span class="date-note" aria-live="polite"></span>{{ d.field.errors }}</p>
+        {% endfor %}
       </div>
     </div>
     <div class="panel">
@@ -201,6 +204,32 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   [...all, fyBox].forEach(el => el && ['input', 'change'].forEach(ev => el.addEventListener(ev, update)));
   update();
+
+  // Forecast dates: target status as you type. A target date is pass/fail, so no day counts:
+  //   met / missed (KPI failure) once it has passed; before that, a different forecast needs a PCCF in time.
+  document.querySelectorAll('.date-check').forEach(p => {
+    const input = p.querySelector('input'), note = p.querySelector('.date-note');
+    const actualBox = document.querySelector(`[name="${p.dataset.actual}"]`);
+    const { approved, today } = p.dataset, target = !!p.dataset.target, kpi = !!p.dataset.kpi;
+    const say = (text, cls) => { note.textContent = text; if (cls) note.classList.add(cls); };
+    const check = () => {
+      note.className = 'date-note'; note.textContent = '';
+      if (!approved) return;
+      const forecast = input.value, actual = actualBox ? actualBox.value : '';   // ISO dates compare as text
+      if (!target) {                       // award / closeout: for information only
+        if (forecast && forecast !== approved) say('Differs from the approved date');
+        return;
+      }
+      if (actual) return actual <= approved ? say('✓ Target met', 'ok')
+                                            : say(kpi ? '✗ Target missed · KPI failure recorded' : '✗ Target missed: KPI issue', 'bad');
+      if (approved < today) return say(kpi ? '✗ Target passed · KPI failure recorded'
+                                           : '✗ Target passed without being met: KPI issue', 'bad');
+      if (!forecast || forecast === approved) return say('✓ On track for the target', 'ok');
+      say(`⚠ Differs from the target: submit a PCCF before ${approved} to change it`, 'warn');
+    };
+    [input, actualBox].forEach(el => el && ['input', 'change'].forEach(ev => el.addEventListener(ev, check)));
+    check();
+  });
 });
 </script>
 {% endblock %}

@@ -114,13 +114,19 @@ tr.mpsr-done td{background:color-mix(in srgb, var(--good-soft) 45%, transparent)
 .mpsr-grid{grid-template-columns:minmax(0,5fr) minmax(0,7fr);align-items:start}
 @media (max-width:1150px){.mpsr-grid{grid-template-columns:1fr}}
 .mpsr-facts{position:sticky;top:12px}
-@media (max-width:1150px){.mpsr-facts{position:static}}
+@media (max-width:1150px){.mpsr-facts{position:static}.mpsr-form{order:-1}}  /* stacked: what you update comes first */
 table.compact th,table.compact td{padding:6px 6px;font-size:12.5px}
 .mpsr-form .panel{margin-bottom:12px}
 .mpsr-form textarea{min-height:96px}
 /* MPSR field rows: labels get the same height (text sits at the bottom), so every box lines up and help text hangs below */
 .mpsr-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 12px;align-items:start}
 .mpsr-row p > label:first-child{min-height:2.6em;display:flex !important;align-items:flex-end;line-height:1.3}
+.date-note{display:block;font-size:12px;line-height:1.35;margin-top:2px;color:var(--ink-2)}
+.date-note:empty{display:none}
+.date-note.ok{color:var(--good-ink)} .date-note.warn{color:var(--warn-ink);font-weight:600}
+.date-note.bad{color:var(--crit-ink);font-weight:600}
+small.tgt.met{color:var(--good-ink)} small.tgt.missed{color:var(--crit-ink);font-weight:600}
+small.tgt.pccf{color:var(--warn-ink);font-weight:600}
 .mpsr-row .helptext{margin-top:3px;line-height:1.35}
 .mpsr-row .check{align-self:end}
 .mpsr-row.q{grid-template-columns:repeat(6,minmax(0,1fr));margin-top:8px}
@@ -274,6 +280,10 @@ dialog.confirm .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:4p
 .target-flag{padding:11px 14px;border-radius:10px;margin-bottom:12px;background:var(--accent-soft);color:var(--accent-ink);
   border:1px solid var(--accent)}
 .target-flag ul{margin:3px 0 0;padding-left:18px;font-size:13px;color:var(--ink)}
+.kpi-issues{padding:11px 14px;border-radius:10px;margin-bottom:12px;background:var(--crit-soft);color:var(--crit-ink);
+  border:1px solid var(--crit);font-size:13px}
+.kpi-issues .kpi-item{border-top-color:rgba(0,0,0,.08);color:var(--ink)}
+.kpi-issues strong{display:block;margin-bottom:4px}
 .kpi-list{padding:10px 14px;border-radius:10px;margin-bottom:16px;border:1px solid var(--line);background:var(--surface);font-size:13px}
 .kpi-item{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--line)}
 .kpi-list strong{display:block;margin-bottom:4px}

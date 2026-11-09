@@ -25,6 +25,30 @@
 <div class="grid mpsr-grid">
   {# ---------------- left: what the PM needs to see #}
   <div class="mpsr-facts">
+    {% with prev=since.0 ch=since.1 %}
+    <div class="panel since">
+      <div class="panel-head"><h2>Changed since {% if prev %}the {{ prev.period|date:"F" }} report{% else %}last report{% endif %}</h2>
+        {% if ch %}<span class="pill warn">{{ ch|length }}</span>{% endif %}</div>
+      {% if not prev %}
+        <p class="muted" style="margin:0">No earlier month has been reported yet. Saving this MPSR records what you report for {{ period|date:"F" }}, and next month's changes will show here.</p>
+      {% elif not ch %}
+        <p style="margin:0" class="ink2">✓ Nothing has changed since the {{ prev.period|date:"F Y" }} report (saved {{ prev.saved_at|date:"Y-m-d" }}).</p>
+      {% else %}
+        <table class="compact">
+          <thead><tr><th></th><th>{{ prev.period|date:"M Y" }}</th><th>Now</th><th class="n"></th></tr></thead>
+          <tbody>{% for c in ch %}
+            {% if c.is_long_text %}
+            <tr><td colspan="4"><strong>{{ c.label }}</strong> changed
+              <details><summary style="font-size:12px">Show the {{ prev.period|date:"F" }} text</summary><div class="pre" style="font-size:12.5px;margin-top:4px">{{ c.before_text }}</div></details></td></tr>
+            {% else %}
+            <tr><td class="ink2">{{ c.label }}</td><td class="muted">{{ c.before_text }}</td><td><strong>{{ c.after_text }}</strong></td>
+              <td class="n nowrap" style="font-size:12px">{{ c.difference }}</td></tr>
+            {% endif %}
+          {% endfor %}</tbody>
+        </table>
+      {% endif %}
+    </div>
+    {% endwith %}
     <div class="panel">
       <div class="panel-head"><h2>Budget</h2></div>
       {% include "tracker/_budget_bar.html" with f=fin lg=True %}

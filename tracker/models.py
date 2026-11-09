@@ -469,6 +469,19 @@ class MPSRReview(models.Model):
         constraints = [models.UniqueConstraint(fields=["project", "period"], name="one_review_per_month")]
 
 
+class MPSRSnapshot(models.Model):
+    """What was reported for a project in a month: the figures as they stood when that month's MPSR was saved.
+    Saving the MPSR again in the same month replaces it. See tracker/snapshot.py for the fields."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="mpsr_snapshots")
+    period = models.DateField(help_text="First day of the reporting month")
+    saved_at = models.DateTimeField(auto_now=True)
+    data = models.JSONField(default=dict)
+
+    class Meta:
+        ordering = ["-period"]
+        constraints = [models.UniqueConstraint(fields=["project", "period"], name="one_snapshot_per_month")]
+
+
 class ValueOfWork(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="vow_entries")
     reporting_date = models.DateField()

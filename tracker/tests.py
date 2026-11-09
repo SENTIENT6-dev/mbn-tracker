@@ -569,6 +569,38 @@ class MPSRTests(Base):
         self.assertTrue(MPSRReview.objects.filter(project=self.p).exists())
         self.assertEqual(self.client.get("/mpsr/").context["done_count"], 1)
 
+    def test_snapshot_each_month_and_changes_since(self):
+        from .models import MPSRSnapshot
+        oct_, nov = "?period=2026-10", "?period=2026-11"
+        r = self.client.get(f"/mpsr/{self.p.pk}/{oct_}")
+        self.assertIsNone(r.context["since"][0])                       # nothing reported before
+        self.assertContains(r, "No earlier month has been reported yet")
+        self.client.post(f"/mpsr/{self.p.pk}/{oct_}", self.post_data(r, **{"comment-text": "October.", "save": "1"}))
+        snap = MPSRSnapshot.objects.get(project=self.p, period=dt.date(2026, 10, 1))
+        self.assertEqual((snap.data["comments"], snap.data["q1"], snap.data["pccf"]), ("October.", "10.00", "PCCF 0"))
+
+        r = self.client.get(f"/mpsr/{self.p.pk}/{nov}")
+        prev, ch = r.context["since"]
+        self.assertEqual((prev.period, ch), (dt.date(2026, 10, 1), []))
+        self.assertContains(r, "Nothing has changed since the October 2026 report")
+
+        self.client.post(f"/mpsr/{self.p.pk}/{nov}", self.post_data(r, **{
+            "comment-text": "November.", "cash-q1": "1500", "save": "1"}))
+        r = self.client.get(f"/mpsr/{self.p.pk}/{nov}")
+        ch = {c.key: c for c in r.context["since"][1]}                 # still compared with October
+        self.assertEqual(set(ch), {"q1", "comments"})
+        self.assertEqual((ch["q1"].before_text, ch["q1"].after_text, ch["q1"].difference),
+                         ("$10.00", "$1,500.00", "+$1,490.00"))
+        self.assertContains(r, "Changed since the October report")
+        self.assertEqual(MPSRSnapshot.objects.filter(project=self.p).count(), 2)
+
+        # saving November again replaces November's record
+        self.client.post(f"/mpsr/{self.p.pk}/{nov}", self.post_data(r, **{"cash-q1": "1600", "save": "1"}))
+        self.assertEqual(MPSRSnapshot.objects.get(project=self.p, period=dt.date(2026, 11, 1)).data["q1"], "1600.00")
+        r = self.client.get(f"/projects/{self.p.pk}/?tab=history")
+        self.assertEqual([s["period"] for s in r.context["reported"]], [dt.date(2026, 11, 1), dt.date(2026, 10, 1)])
+        self.assertEqual(r.context["reported"][0]["fy_total"], D("1620"))   # 1,600 + Q2 20
+
     def test_saving_without_changes_marks_done_but_logs_nothing(self):
         from .models import MPSRReview
         ValueOfWork.objects.create(project=self.p, reporting_date="2026-01-01", total_no_fees=D("1000"),

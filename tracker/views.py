@@ -262,8 +262,23 @@ def project_detail(request, pk):
         "vows": project.vow_entries.all()[:12],
         "issues": project.dataissue_set.filter(resolved=False),
         # forecasts, dates, comments, risk and value of work are edited on the MPSR page only (one set of rules)
+        "reported": _reported(project) if tab == "history" else [],
     }
     return render(request, "tracker/project_detail.html", ctx)
+
+
+def _reported(project):
+    """The monthly MPSR snapshots, newest first, with the figures the History tab shows."""
+    def dec(v):
+        return Decimal(str(v)) if v not in (None, "") else None
+    out = []
+    for s in project.mpsr_snapshots.all()[:36]:
+        d = s.data
+        out.append({"period": s.period, "saved_at": s.saved_at, "d": d,
+                    "fy_total": sum((dec(d.get(q)) or ZERO for q in ("q1", "q2", "q3", "q4")), ZERO),
+                    "budget": dec(d.get("budget_with_fee")), "committed": dec(d.get("committed")),
+                    "invoiced": dec(d.get("invoiced")), "vow": dec(d.get("vow_total"))})
+    return out
 
 
 def _log(project, kind, text="", data=None):

@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from . import forms as F
+from . import snapshot
 from .models import MPSRReview, Project, ProjectStatus, StatusHistory, ValueOfWork
 from .textutil import current_fiscal_year, fiscal_label
 from .services import (PCCF_DATES, TENDER_DAYS, approved_cash_for_year, approved_for_year, current_year_funding, financials, flagged_keys, forecast_is_stale, milestones,
@@ -139,6 +140,7 @@ def _save(project, status, fin, forms, period):
                 defaults={k: entry[k] for k in ("total_no_fees", "previous_years_no_fees", "current_year_funding")})
             changed.append("value of work")
         MPSRReview.objects.update_or_create(project=project, period=period)
+        snapshot.take(project, period)        # what was reported this month (saving again replaces it)
     return changed
 
 
@@ -213,6 +215,7 @@ def mpsr_project(request, pk):
         "flagged": flagged_keys(fin), "current_fy": current_fiscal_year(today),
         "ap": approved_for_year(fin.pccf, status.fiscal_year),
         "date_fields": _date_fields(forms["dates"], fin), "today": today,
+        "since": snapshot.changes(project, period),
         "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year)
         if fin.pccf and not forecast_is_stale(status) else None,
         "done_count": len(done & set(order))})

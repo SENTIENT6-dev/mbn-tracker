@@ -275,6 +275,28 @@ Actual: {% if q.state == 'later' %}not started{% else %}{{ q.actual|money }} (in
 </table></div>
 
 {% else %}
+<div class="panel">
+  <div class="panel-head"><h2>Reported each month</h2><span class="spacer"></span>
+    <span class="muted" style="font-size:12px">Recorded when the month's MPSR is saved</span></div>
+  {% if reported %}
+  <div class="tablewrap"><table class="compact">
+    <thead><tr><th>Month</th><th>Stage</th><th class="n">This FY forecast</th><th>Design end</th><th>Substantial</th>
+      <th class="n">Budget incl. fee</th><th class="n">Committed</th><th class="n">Invoiced</th><th class="n">VOW</th><th>Flags</th><th>Saved</th></tr></thead>
+    <tbody>{% for s in reported %}
+      <tr><td class="nowrap"><strong>{{ s.period|date:"M Y" }}</strong></td><td>{{ s.d.stage|default:"–" }}</td>
+        <td class="n">{{ s.fy_total|money }}{% if s.d.fiscal_year %}<div class="muted" style="font-size:11px">FY {{ s.d.fiscal_year }}</div>{% endif %}</td>
+        <td class="nowrap">{{ s.d.actual_design_end|default:s.d.design_end|default:"–" }}{% if s.d.actual_design_end %} <span class="muted">actual</span>{% endif %}</td>
+        <td class="nowrap">{{ s.d.actual_substantial|default:s.d.substantial|default:"–" }}{% if s.d.actual_substantial %} <span class="muted">actual</span>{% endif %}</td>
+        <td class="n">{{ s.budget|money }}<div class="muted" style="font-size:11px">{{ s.d.pccf|default:"" }}</div></td>
+        <td class="n">{{ s.committed|money }}</td><td class="n">{{ s.invoiced|money }}</td><td class="n">{{ s.vow|money }}</td>
+        <td><div class="flags">{% if s.d.pccf_required %}<span class="pill warn">⚠ PCCF</span>{% endif %}
+          {% if s.d.kpi_issues %}<span class="pill over">⚑ {{ s.d.kpi_issues }} KPI</span>{% endif %}
+          {% if s.d.kpi_failures %}<span class="pill crit">✗ {{ s.d.kpi_failures }} failed</span>{% endif %}</div></td>
+        <td class="nowrap muted" style="font-size:12px">{{ s.saved_at|date:"Y-m-d" }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="muted" style="margin:0">Nothing recorded yet. A month is recorded when its MPSR is saved.</p>{% endif %}
+</div>
 <div class="grid g2">
   <div class="panel">
     <div class="panel-head"><h2>Update history</h2></div>

@@ -44,7 +44,7 @@
         <thead><tr><th></th><th class="n">Prev. yrs</th><th class="n">Q1</th><th class="n">Q2</th><th class="n">Q3</th><th class="n">Q4</th><th class="n">This FY</th><th class="n">Next</th><th class="n">Future</th></tr></thead>
         <tbody>
           {% if fin.pccf %}<tr><td class="ink2" title="From PCCF {{ fin.pccf.submission }}. Only a new PCCF changes these.">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{{ fin.pccf.q1|money }}</td><td class="n">{{ fin.pccf.q2|money }}</td><td class="n">{{ fin.pccf.q3|money }}</td><td class="n">{{ fin.pccf.q4|money }}</td><td class="n"><strong>{% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</strong></td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
-          <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n">{{ status.q1|money }}</td><td class="n">{{ status.q2|money }}</td><td class="n">{{ status.q3|money }}</td><td class="n">{{ status.q4|money }}</td><td class="n {% if 'cash' in flagged %}differs{% endif %}"><strong>{{ status.current_year_forecast|money }}</strong></td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
+          <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n">{{ status.q1|money }}</td><td class="n">{{ status.q2|money }}</td><td class="n">{{ status.q3|money }}</td><td class="n">{{ status.q4|money }}</td><td class="n {% if 'cash' in flagged %}differs{% endif %}" id="live-fy-cell"><strong>{{ status.current_year_forecast|money }}</strong></td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -113,8 +113,17 @@
     </div>
     <div class="panel">
       <div class="panel-head"><h2>5 · Forecast cash flow</h2><span class="spacer"></span>
-        <span class="pill {% if forecast_variance|abs <= 1 %}ok{% else %}warn{% endif %}" title="Forecast total vs budget incl. fee">
-          Forecast {{ forecast_total|money }} vs budget {{ fin.budget_with_fee|money }}{% if forecast_variance|abs > 1 %} · {% if not forecast_variance|neg %}+{% endif %}{{ forecast_variance|money }}{% endif %}</span></div>
+        <div class="live-totals">
+          {% if fin.pccf %}
+          <span class="pill {% if 'cash' in flagged %}warn{% elif approved_year != None %}ok{% endif %}" id="live-fy"
+                data-pccf-fy="{{ fin.pccf.fiscal_year|default_if_none:'' }}" data-pccf-year="{{ fin.pccf.current_year_cash_flow }}"
+                data-pccf-next="{{ fin.pccf.next_year }}"
+                title="This fiscal year's forecast (Q1–Q4) vs what PCCF {{ fin.pccf.submission }} approved for it. A difference needs a PCCF.">
+            This FY {{ status.current_year_forecast|money }} vs approved {% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</span>
+          {% endif %}
+          <span class="pill {% if forecast_variance|abs <= 1 %}ok{% else %}warn{% endif %}" id="live-total" data-budget="{{ fin.budget_with_fee }}" title="Forecast total vs budget incl. fee">
+            Forecast {{ forecast_total|money }} vs budget {{ fin.budget_with_fee|money }}{% if forecast_variance|abs > 1 %} · {% if not forecast_variance|neg %}+{% endif %}{{ forecast_variance|money }}{% endif %}</span>
+        </div></div>
       <div class="mpsr-row">
         <p>{{ f.cash.fiscal_year.label_tag }}{{ f.cash.fiscal_year }}{{ f.cash.fiscal_year.errors }}</p>
         <p>{{ f.cash.previous.label_tag }}{{ f.cash.previous }}{{ f.cash.previous.errors }}</p>
@@ -146,4 +155,44 @@
     </div>
   </form>
 </div>
+<script>
+// Cash-flow totals follow the boxes as you type, before saving.
+document.addEventListener('DOMContentLoaded', () => {
+  const box = n => document.querySelector(`[name="cash-${n}"]`);
+  const fyBox = box('fiscal_year');
+  const quarters = ['q1', 'q2', 'q3', 'q4'].map(box);
+  const all = ['previous', 'q1', 'q2', 'q3', 'q4', 'next_year', 'future'].map(box);
+  const totalPill = document.getElementById('live-total');
+  const fyPill = document.getElementById('live-fy');
+  const fyCell = document.getElementById('live-fy-cell');
+  // like the money filter: whole dollars, negatives in brackets
+  const $ = n => { const r = Math.round(n); const t = '$' + Math.abs(r).toLocaleString('en-CA'); return r < 0 ? `(${t})` : t; };
+  // what the PCCF approved for the chosen fiscal year (same rule as the server's PCCF check)
+  const approvedFor = fy => {
+    const d = fyPill.dataset, pfy = parseInt(d.pccfFy, 10);
+    if (!fy || isNaN(pfy) || pfy === fy) return parseFloat(d.pccfYear);
+    if (pfy === fy - 1) return parseFloat(d.pccfNext);
+    return null;
+  };
+  const update = () => {
+    const sum = list => list.reduce((s, el) => s + moneyVal(el), 0);
+    const total = sum(all), thisYear = sum(quarters);
+    const budget = parseFloat(totalPill.dataset.budget), diff = total - budget;
+    totalPill.textContent = `Forecast ${$(total)} vs budget ${$(budget)}` +
+      (Math.abs(diff) > 1 ? ` · ${diff > 0 ? '+' : ''}${$(diff)}` : '');
+    totalPill.className = 'pill ' + (Math.abs(diff) <= 1 ? 'ok' : 'warn');
+    if (fyCell) fyCell.innerHTML = `<strong>${$(thisYear)}</strong>`;
+    if (fyPill) {
+      const approved = approvedFor(parseInt(fyBox && fyBox.value, 10) || null);
+      const off = approved !== null && Math.abs(thisYear - approved) >= 1;
+      fyPill.textContent = `This FY ${$(thisYear)} vs approved ${approved === null ? '–' : $(approved)}` +
+        (off ? ' · PCCF needed' : '');
+      fyPill.className = 'pill ' + (approved === null ? '' : off ? 'warn' : 'ok');
+      if (fyCell) fyCell.classList.toggle('differs', off);
+    }
+  };
+  [...all, fyBox].forEach(el => el && ['input', 'change'].forEach(ev => el.addEventListener(ev, update)));
+  update();
+});
+</script>
 {% endblock %}

@@ -1,5 +1,7 @@
 # IO PM Tracker
 
+[![Checks](https://github.com/SENTIENT6-dev/mbn-tracker/actions/workflows/checks.yml/badge.svg)](https://github.com/SENTIENT6-dev/mbn-tracker/actions/workflows/checks.yml)
+
 Replacement for `MBN.accdb`: projects, PCCF budgets, POs, invoices, change orders and MPSR status,
 as a local web app (Python + Django + SQLite). Data lives in `db.sqlite3` in this folder.
 
@@ -158,6 +160,9 @@ The code is checked with [Ruff](https://docs.astral.sh/ruff/) (settings in `pypr
 ```
 Add `--fix` to let it fix what it can (unused imports, import order...). Run it before pushing; it should say
 "All checks passed!".
+
+GitHub also runs Ruff and the tests on every push (`.github/workflows/checks.yml`); the result shows as the
+"Checks" badge at the top of this page and on each commit.
 
 ## Backups
 The tracker saves a copy of the database automatically the first time it's used each day, into the `backups`

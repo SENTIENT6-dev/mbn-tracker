@@ -8,10 +8,95 @@ from decimal import Decimal
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import PCCF, ChangeOrder, Invoice, Project, PurchaseOrder, ValueOfWork
+from .models import PCCF, ChangeOrder, Invoice, Project, ProjectStatus, PurchaseOrder, ValueOfWork
 
 ZERO = Decimal("0")
 CONSULTANT, CONTRACTOR = "Consultant", "Contractor"
+
+
+# ---------------------------------------------------------------- PCCF required?
+# Approved values only ever come from the latest PCCF; the MPSR forecast is what the PM changes each month.
+# When the forecast moves away from what's approved, a new PCCF is needed. Nothing is stored: the check is
+# worked out on every page, so it clears itself once a new PCCF matches the forecast or the forecast is
+# brought back in line.
+
+CASH_TOLERANCE = Decimal("1")      # cents of rounding don't need a PCCF
+PCCF_DATES = [("design_end", "Design end"), ("substantial", "Substantial performance")]
+
+
+@dataclass
+class PCCFReason:
+    key: str            # "cash", "design_end" or "substantial"
+    label: str
+    approved: object
+    forecast: object
+
+    @property
+    def is_cash(self):
+        return self.key == "cash"
+
+    @property
+    def difference(self):
+        """Forecast minus approved: dollars for cash flow, days for dates (positive = later / more)."""
+        if self.is_cash:
+            return self.forecast - self.approved
+        return (self.forecast - self.approved).days
+
+    @property
+    def text(self):
+        d = self.difference
+        if self.is_cash:
+            sign = "+" if d > 0 else "−"
+            return (f"{self.label}: forecast ${self.forecast:,.0f} vs approved ${self.approved:,.0f} "
+                    f"({sign}${abs(d):,.0f})")
+        return (f"{self.label}: forecast {self.forecast} vs approved {self.approved} "
+                f"({abs(d)} day{'s' if abs(d) != 1 else ''} {'later' if d > 0 else 'earlier'})")
+
+
+def approved_cash_for_year(pccf, fiscal_year):
+    """What the PCCF approved for the forecast's fiscal year, or None when the PCCF doesn't cover it.
+
+    A PCCF written last fiscal year approved this year's spend as its "next year" figure.
+    """
+    if fiscal_year is None or pccf.fiscal_year is None or pccf.fiscal_year == fiscal_year:
+        return pccf.current_year_cash_flow
+    if pccf.fiscal_year == fiscal_year - 1:
+        return pccf.next_year
+    return None
+
+
+def pccf_reasons(project, pccf, status):
+    """Why a new PCCF is needed (empty list = not needed). Only for projects still being reported on."""
+    if pccf is None or status is None or project.status not in (Project.Status.ACTIVE, Project.Status.ON_HOLD):
+        return []
+    out = []
+    approved = approved_cash_for_year(pccf, status.fiscal_year)
+    forecast = status.current_year_forecast
+    if approved is not None and abs(forecast - approved) >= CASH_TOLERANCE:
+        fy = status.fiscal_year_label or pccf.fiscal_year_label
+        out.append(PCCFReason("cash", f"FY {fy} cash flow" if fy else "This year's cash flow", approved, forecast))
+    for field, label in PCCF_DATES:
+        a, f = getattr(pccf, field), getattr(status, field)
+        if a and f and a != f:
+            out.append(PCCFReason(field, label, a, f))
+    return out
+
+
+def pccf_flag_message(before, after):
+    """(level, text) telling the PM how a forecast change affected the PCCF flag, or None if nothing to say."""
+    if after.pccf_required:
+        what = "; ".join(r.text for r in after.pccf_reasons)
+        return ("warning", f"{after.project.io_number}: PCCF required. {what}")
+    if before.pccf_required:
+        return ("success", f"{after.project.io_number}: the forecast matches approved PCCF "
+                           f"{after.pccf.submission} again, so no PCCF is needed.")
+    return None
+
+
+def flagged_keys(fin):
+    """Which values to highlight: "cash", plus milestone keys ("design", "substantial") whose forecast differs."""
+    to_milestone = {"design_end": "design"}
+    return {to_milestone.get(r.key, r.key) for r in fin.pccf_reasons}
 
 
 @dataclass(eq=False)
@@ -19,11 +104,22 @@ class Financials:
     project: Project
     pccf: PCCF = None
     vow: ValueOfWork = None
+    status: ProjectStatus = None
     commitments: Decimal = ZERO
     consultant_commitments: Decimal = ZERO
     contractor_commitments: Decimal = ZERO
     pending: Decimal = ZERO
     invoiced: Decimal = ZERO
+
+    @property
+    def pccf_reasons(self):
+        if not hasattr(self, "_pccf_reasons"):
+            self._pccf_reasons = pccf_reasons(self.project, self.pccf, self.status)
+        return self._pccf_reasons
+
+    @property
+    def pccf_required(self):
+        return bool(self.pccf_reasons)
 
     @property
     def budget_with_fee(self):
@@ -172,8 +268,9 @@ def financials(projects):
     vows = {}
     for v in ValueOfWork.objects.filter(project_id__in=ids).order_by("project_id", "reporting_date"):
         vows[v.project_id] = v
+    statuses = {s.project_id: s for s in ProjectStatus.objects.filter(project_id__in=ids)}
 
-    pos = PurchaseOrder.objects.filter(project_id__in=ids)
+    pos =PurchaseOrder.objects.filter(project_id__in=ids)
     commit = _sum_by(pos, "project_id", "amount")
     consult = _sum_by(pos.filter(vendor__company_type__name=CONSULTANT), "project_id", "amount")
     contract = _sum_by(pos.filter(vendor__company_type__name=CONTRACTOR), "project_id", "amount")
@@ -181,7 +278,7 @@ def financials(projects):
                       "po__project_id", "value")
     invoiced = _sum_by(Invoice.objects.filter(po__project_id__in=ids), "po__project_id", "amount")
 
-    return [Financials(project=p, pccf=latest.get(p.id), vow=vows.get(p.id),
+    return [Financials(project=p, pccf=latest.get(p.id), vow=vows.get(p.id), status=statuses.get(p.id),
                        commitments=commit.get(p.id, ZERO), consultant_commitments=consult.get(p.id, ZERO),
                        contractor_commitments=contract.get(p.id, ZERO), pending=pending.get(p.id, ZERO),
                        invoiced=invoiced.get(p.id, ZERO))

@@ -14,8 +14,8 @@ from . import forms as F
 from .models import (PCCF, ChangeOrder, DataIssue, Invoice, MPSRReview, Project, ProjectStatus, PurchaseOrder,
                      StageGate, StatusHistory, ValueOfWork)
 from .operations import save_change_order
-from .services import (financials, invoice_room, milestones, po_rows, project_financials, resolve_schedule_issue,
-                       schedule_health)
+from .services import (approved_cash_for_year, financials, flagged_keys, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
+                       resolve_schedule_issue, schedule_health)
 
 ZERO = Decimal("0")
 STATUS_FILTERS = {
@@ -58,8 +58,8 @@ def overview(request):
     upcoming = [e for e in events if not e.done and today <= e.date <= today + timedelta(days=90)]
     overdue = [e for e in events if e.overdue(today)]
     attention = sorted(
-        [f for f in rows if f.budget_health in ("over", "tight") or f.schedule["overdue"]],
-        key=lambda f: (f.budget_health != "over", -f.schedule["overdue"], f.remaining_budget))
+        [f for f in rows if f.budget_health in ("over", "tight") or f.schedule["overdue"] or f.pccf_required],
+        key=lambda f: (f.budget_health != "over", not f.pccf_required, -f.schedule["overdue"], f.remaining_budget))
 
     committed_pct = totals["commitments"] / totals["budget"] * 100 if totals["budget"] else 0
     invoiced_pct = totals["invoiced"] / totals["budget"] * 100 if totals["budget"] else 0
@@ -101,7 +101,7 @@ def overview(request):
         "months": months, "last12": last12, "cash": cash, "vendors": vend, "latest_invoice": latest,
         "rows": sorted(rows, key=lambda f: -f.budget), "totals": totals, "stages": stages,
         "upcoming": upcoming[:12], "upcoming_count": len(upcoming), "overdue_count": len(overdue),
-        "attention": attention[:8], "today": today,
+        "attention": attention[:8], "today": today, "pccf_count": sum(f.pccf_required for f in rows),
         "committed_pct": committed_pct, "invoiced_pct": invoiced_pct,
         "open_cos": ChangeOrder.objects.filter(status__in=["requested", "approved"]).count(),
         "mpsr_done": MPSRReview.objects.filter(period=today.replace(day=1), project__in=projects).count(),
@@ -231,7 +231,8 @@ def project_detail(request, pk):
     ctx = {
         "project": project, "status": status, "fin": fin, "pos": pos, "tab": tab,
         "stepper": stepper, "timeline": timeline, "years": years, "today_pos": at(today),
-        "quarters": quarters, "cash_top": top,
+        "quarters": quarters, "cash_top": top, "flagged": flagged_keys(fin),
+        "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year) if fin.pccf else None,
         "pccfs": pccfs, "has_charter": any(p.submission == 0 for p in pccfs),
         "change_orders": ChangeOrder.objects.filter(po__project=project).select_related("po__vendor"),
         "history": project.status_history.all()[:100],
@@ -285,12 +286,16 @@ def project_update(request, pk, section):
             form_cls, kind, msg = sections[section]
             form = form_cls(request.POST, instance=status, prefix=section)
             if form.is_valid():
+                before = project_financials(project)
                 form.save()
                 data = _jsonable(form)
                 if "stage" in data and form.cleaned_data.get("stage"):
                     data["stage"] = form.cleaned_data["stage"].name
                 _log(project, kind, data=data)
                 messages.success(request, msg)
+                flag = pccf_flag_message(before, project_financials(project))
+                if flag:
+                    getattr(messages, flag[0])(request, flag[1])
             else:
                 messages.error(request, f"Not saved: {form.errors.as_text()}")
         elif section in ("comment", "risk"):
@@ -395,6 +400,10 @@ def project_new(request):
     return render(request, "tracker/project_new.html", {"form": form, "charter": charter})
 
 
+FORECAST_TO_PCCF = ["fiscal_year", "previous", "q1", "q2", "q3", "q4", "next_year", "future",
+                    "design_end", "construction_award", "substantial", "closeout"]
+
+
 def pccf_form(request, pk, pccf_id=None):
     project = get_object_or_404(Project, pk=pk)
     instance = get_object_or_404(PCCF, pk=pccf_id, project=project) if pccf_id else None
@@ -405,6 +414,13 @@ def pccf_form(request, pk, pccf_id=None):
         if last and not adding_charter:  # start from the previous submission, like a PCCF does
             initial = {f.name: getattr(last, f.name) for f in PCCF._meta.fields
                        if f.name not in ("id", "project", "submission", "date", "final", "fiscal_year")}
+        status = ProjectStatus.objects.filter(project=project).first()
+        from_forecast = request.GET.get("from") == "forecast" and status is not None and not adding_charter
+        if from_forecast:   # the new PCCF approves the current MPSR forecast: cash flow and dates
+            for name in FORECAST_TO_PCCF:
+                value = getattr(status, name)
+                if value is not None:
+                    initial[name] = value
         initial["date"] = timezone.localdate()
     form = F.PCCFForm(request.POST or None, instance=instance, initial=initial, project=project)
     if request.method == "POST" and form.is_valid():
@@ -429,6 +445,7 @@ def pccf_form(request, pk, pccf_id=None):
         title, heading = f"{project.io_number}: new {what}", f"New {what}"
     return render(request, "tracker/pccf_form.html", {
         "form": form, "title": title, "heading": heading, "project": project, "is_new": not instance,
+        "from_forecast": not instance and request.GET.get("from") == "forecast",
         "prefilled": str(last.submission) if (last and not instance and not adding_charter) else "",
         "back": f"/projects/{pk}/?tab=budget"})
 

@@ -1,5 +1,5 @@
 {% extends "tracker/base.html" %}{% load money %}
-{% block title %}MPSR {{ project.io_number }} – MBN Tracker{% endblock %}
+{% block title %}MPSR {{ project.io_number }} – IO PM Tracker{% endblock %}
 {% block content %}
 <div class="page-head">
   <div><div class="ink2" style="font-size:13px"><a href="/mpsr/{{ q }}">MPSR · {{ period|date:"F Y" }}</a> › {{ project.io_number }}
@@ -20,6 +20,8 @@
   </div>
 </div>
 
+{% include "tracker/_pccf_flag.html" with fin=fin %}
+
 <div class="grid mpsr-grid">
   {# ---------------- left: what the PM needs to see #}
   <div class="mpsr-facts">
@@ -27,7 +29,7 @@
       <div class="panel-head"><h2>Budget</h2></div>
       {% include "tracker/_budget_bar.html" with f=fin lg=True %}
       <dl class="kv" style="margin-top:12px">
-        <dt>Budget incl. fee</dt><dd><strong>{{ fin.budget_with_fee|money }}</strong> <span class="muted">(PCCF {{ fin.pccf.submission|default:"–" }})</span></dd>
+        <dt>Budget incl. fee</dt><dd><strong>{{ fin.budget_with_fee|money }}</strong> <span class="muted">(PCCF {{ fin.pccf.submission|default_if_none:"–" }})</span></dd>
         <dt>Committed</dt><dd>{{ fin.commitments|money }}{% if fin.pending %} + {{ fin.pending|money }} pending{% endif %}</dd>
         <dt>Invoiced</dt><dd>{{ fin.invoiced|money }}</dd>
         <dt>Uncommitted</dt><dd class="{% if fin.remaining_budget|neg %}neg{% endif %}">{{ fin.remaining_budget|money }}</dd>
@@ -39,10 +41,10 @@
     <div class="panel">
       <div class="panel-head"><h2>Cash flow</h2><span class="spacer"></span><span class="muted" style="font-size:12px">FY {{ status.fiscal_year_label|default:"–" }}</span></div>
       <table class="compact">
-        <thead><tr><th></th><th class="n">Prev. yrs</th><th class="n">Q1</th><th class="n">Q2</th><th class="n">Q3</th><th class="n">Q4</th><th class="n">Next</th><th class="n">Future</th></tr></thead>
+        <thead><tr><th></th><th class="n">Prev. yrs</th><th class="n">Q1</th><th class="n">Q2</th><th class="n">Q3</th><th class="n">Q4</th><th class="n">This FY</th><th class="n">Next</th><th class="n">Future</th></tr></thead>
         <tbody>
-          {% if fin.pccf %}<tr><td class="ink2">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{{ fin.pccf.q1|money }}</td><td class="n">{{ fin.pccf.q2|money }}</td><td class="n">{{ fin.pccf.q3|money }}</td><td class="n">{{ fin.pccf.q4|money }}</td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
-          <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n">{{ status.q1|money }}</td><td class="n">{{ status.q2|money }}</td><td class="n">{{ status.q3|money }}</td><td class="n">{{ status.q4|money }}</td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
+          {% if fin.pccf %}<tr><td class="ink2" title="From PCCF {{ fin.pccf.submission }}. Only a new PCCF changes these.">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{{ fin.pccf.q1|money }}</td><td class="n">{{ fin.pccf.q2|money }}</td><td class="n">{{ fin.pccf.q3|money }}</td><td class="n">{{ fin.pccf.q4|money }}</td><td class="n"><strong>{% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</strong></td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
+          <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n">{{ status.q1|money }}</td><td class="n">{{ status.q2|money }}</td><td class="n">{{ status.q3|money }}</td><td class="n">{{ status.q4|money }}</td><td class="n {% if 'cash' in flagged %}differs{% endif %}"><strong>{{ status.current_year_forecast|money }}</strong></td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -57,7 +59,7 @@
             <td>{{ e.forecast }}<div class="muted" style="font-size:11.5px">deadline: design end + 30 days</div></td>
             <td>{% if e.css == 'missed' %}<span class="mark missed">✗</span>{% endif %}{% if e.actual %}<span class="ink2" style="font-size:12px">{{ e.actual }}</span><br>{% endif %}{% include "tracker/_tender_tick.html" with e=e next=request.get_full_path %}</td></tr>
           {% else %}
-          <tr><td>{{ e.label }}</td><td>{{ e.approved|default:"–" }}</td><td>{{ e.forecast|default:"–" }}</td>
+          <tr><td>{{ e.label }}</td><td>{{ e.approved|default:"–" }}</td><td class="{% if e.key in flagged %}differs{% endif %}">{{ e.forecast|default:"–" }}</td>
             <td>{% if e.actual %}<span class="mark done">✓</span>{{ e.actual }}{% elif e.css == 'missed' %}<span class="mark missed">✗</span><span class="neg">none</span>{% else %}–{% endif %}</td></tr>
           {% endif %}
         {% empty %}<tr><td colspan="4" class="muted">No milestone dates yet.</td></tr>{% endfor %}</tbody>

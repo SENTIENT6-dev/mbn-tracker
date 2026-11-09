@@ -936,3 +936,85 @@ class TenderConfirmTests(Base):
             self.assertContains(r, "Not saved", msg_prefix=bad)
             self.st.refresh_from_db()
             self.assertIsNone(self.st.actual_tender, bad)
+
+
+class PCCFRequiredTests(Base):
+    """Base project: approved PCCF 0 has Q1 1,000 + Q2 2,000 this year; the forecast has Q1 10 + Q2 20."""
+
+    def _fin(self):
+        return project_financials(Project.objects.get(pk=self.p.pk))
+
+    def _status(self, **kw):
+        ProjectStatus.objects.filter(project=self.p).update(**kw)
+
+    def _cash(self, **quarters):
+        data = {"cash-fiscal_year": "", **{f"cash-{k}": "0" for k in ("previous", "q1", "q2", "q3", "q4",
+                                                                       "next_year", "future")}}
+        data.update({f"cash-{k}": v for k, v in quarters.items()})
+        return self.client.post(f"/projects/{self.p.pk}/update/cash/", data, follow=True)
+
+    def test_cash_flow_difference_flags(self):
+        f = self._fin()
+        self.assertTrue(f.pccf_required)
+        self.assertEqual([r.key for r in f.pccf_reasons], ["cash"])
+        self.assertIn("forecast $30 vs approved $3,000", f.pccf_reasons[0].text)
+
+    def test_cents_dont_flag(self):
+        self._status(q1=D("1000.40"), q2=D("2000"))
+        self.assertFalse(self._fin().pccf_required)
+
+    def test_design_end_and_substantial_dates_flag(self):
+        self._status(q1=D("1000"), q2=D("2000"), design_end=dt.date(2026, 6, 1), substantial=dt.date(2027, 3, 1))
+        PCCF.objects.filter(project=self.p).update(design_end=dt.date(2026, 6, 1), substantial=dt.date(2027, 1, 30))
+        f = self._fin()
+        self.assertEqual([r.key for r in f.pccf_reasons], ["substantial"])
+        self.assertIn("30 days later", f.pccf_reasons[0].text)
+        self._status(substantial=dt.date(2027, 1, 30))
+        self.assertFalse(self._fin().pccf_required)
+
+    def test_other_dates_dont_flag(self):
+        self._status(q1=D("1000"), q2=D("2000"), closeout=dt.date(2028, 1, 1), construction_award=dt.date(2026, 9, 1))
+        PCCF.objects.filter(project=self.p).update(closeout=dt.date(2027, 1, 1))
+        self.assertFalse(self._fin().pccf_required)
+
+    def test_new_pccf_clears_flag(self):
+        PCCF.objects.create(project=self.p, submission=1, q1=D("10"), q2=D("20"))
+        self.assertFalse(self._fin().pccf_required)
+
+    def test_changing_forecast_back_clears_flag_with_message(self):
+        r = self._cash(q1="1000", q2="2000")
+        self.assertFalse(self._fin().pccf_required)
+        self.assertContains(r, "matches approved PCCF 0 again")
+        r = self._cash(q1="1000", q2="2500")
+        self.assertTrue(self._fin().pccf_required)
+        self.assertContains(r, "PCCF required")
+
+    def test_pccf_from_last_fiscal_year_uses_its_next_year(self):
+        PCCF.objects.filter(project=self.p).update(fiscal_year=2026, next_year=D("30"))
+        self._status(fiscal_year=2027)
+        self.assertFalse(self._fin().pccf_required)       # last year's PCCF approved 30 for this year
+        PCCF.objects.filter(project=self.p).update(fiscal_year=2024)
+        self.assertFalse(self._fin().pccf_required)       # too old to know what it approved for this year
+
+    def test_closed_projects_not_flagged(self):
+        Project.objects.filter(pk=self.p.pk).update(status=Project.Status.CLOSED)
+        self.assertFalse(self._fin().pccf_required)
+
+    def test_flag_shown_on_screens(self):
+        r = self.client.get(f"/mpsr/{self.p.pk}/")
+        self.assertContains(r, "PCCF required: the forecast no longer matches approved PCCF 0")
+        self.assertContains(r, f"/projects/{self.p.pk}/pccf/new/?from=forecast")
+        self.assertContains(r, "differs")
+        self.assertContains(self.client.get("/mpsr/"), "⚠ Required")
+        self.assertContains(self.client.get(f"/projects/{self.p.pk}/"), "PCCF required")
+        self.assertEqual(self.client.get("/").context["pccf_count"], 1)
+
+    def test_new_pccf_from_forecast_prefills_forecast(self):
+        self._status(design_end=dt.date(2026, 6, 1), fiscal_year=2027)
+        r = self.client.get(f"/projects/{self.p.pk}/pccf/new/?from=forecast")
+        form = r.context["form"]
+        self.assertEqual(form.initial["q1"], D("10"))
+        self.assertEqual(form.initial["design_end"], dt.date(2026, 6, 1))
+        self.assertEqual(form.initial["fiscal_year"], 2027)
+        self.assertEqual(form.initial["design_cost"], D("100000"))     # budget still from the last PCCF
+        self.assertContains(r, "start from the current MPSR forecast")

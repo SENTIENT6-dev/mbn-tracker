@@ -1,0 +1,11 @@
+{# "PCCF required" banner. Needs: fin (Financials) #}
+{% if fin.pccf_required %}
+<div class="pccf-flag" role="status">
+  <div class="what">
+    <strong>⚠ PCCF required: the forecast no longer matches approved PCCF {{ fin.pccf.submission }}</strong>
+    <ul>{% for r in fin.pccf_reasons %}<li>{{ r.text }}</li>{% endfor %}</ul>
+    <div style="font-size:12.5px;margin-top:5px">This clears once a new PCCF approves these values, or the forecast is changed back to match.</div>
+  </div>
+  <a class="btn primary" href="/projects/{{ fin.project.pk }}/pccf/new/?from=forecast">Start PCCF from forecast</a>
+</div>
+{% endif %}

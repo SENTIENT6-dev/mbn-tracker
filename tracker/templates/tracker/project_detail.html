@@ -1,5 +1,5 @@
 {% extends "tracker/base.html" %}{% load money %}
-{% block title %}{{ project.io_number }} – MBN Tracker{% endblock %}
+{% block title %}{{ project.io_number }} – IO PM Tracker{% endblock %}
 {% block head %}
 <style>
 .stepper{display:flex;gap:4px;margin:4px 0 20px;overflow-x:auto}
@@ -57,7 +57,7 @@
 {% endif %}
 
 <div class="tiles">
-  <div class="tile"><div class="k">Budget incl. fee</div><div class="v">{{ fin.budget_with_fee|money }}</div><div class="d">PCCF {{ fin.pccf.submission|default:"–" }} · {{ fin.budget|money }} before fee</div></div>
+  <div class="tile"><div class="k">Budget incl. fee</div><div class="v">{{ fin.budget_with_fee|money }}</div><div class="d">PCCF {{ fin.pccf.submission|default_if_none:"–" }} · {{ fin.budget|money }} before fee</div></div>
   <div class="tile"><div class="k">Committed</div><div class="v">{{ fin.commitments|money }}</div><div class="d">{{ pos|length }} PO{{ pos|length|pluralize }}{% if fin.pending %} + {{ fin.pending|money }} pending{% endif %}</div></div>
   <div class="tile {% if fin.remaining_budget|neg %}alert{% endif %}"><div class="k">Uncommitted budget</div><div class="v">{{ fin.remaining_budget|money }}</div><div class="d">{% include "tracker/_health.html" with f=fin %}</div></div>
   <div class="tile"><div class="k">Invoiced</div><div class="v">{{ fin.invoiced|money }}</div><div class="d">{{ fin.spent_percent|floatformat:0 }}% of budget</div></div>
@@ -74,6 +74,7 @@
   {% include "tracker/_budget_bar.html" with f=fin lg=True %}
 </div>
 
+{% include "tracker/_pccf_flag.html" with fin=fin %}
 {% for i in issues %}<div class="banner">{{ i.summary }} <a href="/issues/">Data issues</a></div>{% endfor %}
 {% if not has_charter %}<div class="banner">No charter (PCCF 0) on file for this project. It was set up before charters were required.
   <a href="/projects/{{ project.pk }}/pccf/new/?charter=1">Add the charter</a></div>{% endif %}
@@ -148,8 +149,8 @@ Forecast: {{ q.forecast|money }}">
     <table style="margin-top:14px">
       <thead><tr><th></th><th class="n">Previous yrs</th><th class="n">This year</th><th class="n">Next year</th><th class="n">Future</th></tr></thead>
       <tbody>
-        {% if fin.pccf %}<tr><td class="ink2">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{{ fin.pccf.current_year_cash_flow|money }}</td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
-        <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n">{{ status.current_year_forecast|money }}</td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
+        {% if fin.pccf %}<tr><td class="ink2" title="From PCCF {{ fin.pccf.submission }}. Only a new PCCF changes these.">Approved</td><td class="n">{{ fin.pccf.previous|money }}</td><td class="n">{% if approved_year != None %}{{ approved_year|money }}{% else %}–{% endif %}</td><td class="n">{{ fin.pccf.next_year|money }}</td><td class="n">{{ fin.pccf.future|money }}</td></tr>{% endif %}
+        <tr><td class="ink2">Forecast</td><td class="n">{{ status.previous|money }}</td><td class="n {% if 'cash' in flagged %}differs{% endif %}">{{ status.current_year_forecast|money }}</td><td class="n">{{ status.next_year|money }}</td><td class="n">{{ status.future|money }}</td></tr>
       </tbody>
     </table>
     <details style="margin-top:12px"><summary>Update forecast</summary>

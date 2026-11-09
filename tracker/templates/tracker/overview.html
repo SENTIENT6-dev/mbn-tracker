@@ -20,6 +20,8 @@
     <div class="d">on the calendar</div></a>
   <a class="tile {% if overdue_count %}alert{% endif %}" href="/calendar/"><div class="k">Overdue milestones</div><div class="v">{{ overdue_count }}</div>
     <div class="d">forecast passed, no actual date</div></a>
+  <a class="tile {% if pccf_count %}warn{% endif %}" href="/mpsr/"><div class="k">PCCF required</div><div class="v">{{ pccf_count }}</div>
+    <div class="d">forecast differs from approved</div></a>
   <a class="tile" href="/change-orders/"><div class="k">Open change orders</div><div class="v">{{ open_cos }}</div>
     <div class="d">awaiting approval or processing</div></a>
   <a class="tile" href="/mpsr/"><div class="k">MPSR {{ today|date:"F" }}</div><div class="v">{{ mpsr_done }} / {{ rows|length }}</div>
@@ -92,8 +94,9 @@ Current forecast: {{ q.forecast|money }}"><div class="b a" style="height:{{ q.a_
             <span>{% include "tracker/_health.html" with f=f %}</span></div>
           <div class="ink2" style="font-size:12.5px">{{ f.project.title|truncatechars:44 }}
             {% if f.budget_health == 'over' %} · over by {{ f.remaining_budget|abs|money }}{% endif %}</div>
+          {% if f.pccf_required %}<div style="margin-top:3px"><span class="pill warn">⚠ PCCF required</span></div>{% endif %}
         </a>
-      {% empty %}<p class="muted">Nothing over budget or overdue.</p>{% endfor %}
+      {% empty %}<p class="muted">Nothing over budget, overdue or waiting on a PCCF.</p>{% endfor %}
     </div>
 
     <div class="panel">

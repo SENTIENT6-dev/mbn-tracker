@@ -13,7 +13,8 @@ from django.utils import timezone
 
 from . import forms as F
 from .models import MPSRReview, Project, ProjectStatus, StatusHistory, ValueOfWork
-from .services import financials, milestones, project_financials
+from .services import (approved_cash_for_year, financials, flagged_keys, milestones, pccf_flag_message,
+                       project_financials)
 
 ZERO = Decimal("0")
 REPORTING = [Project.Status.ACTIVE, Project.Status.ON_HOLD]
@@ -60,7 +61,7 @@ def mpsr_list(request):
         "pct": (len(rows) - len(pending)) / len(rows) * 100 if rows else 0,
         "first_pending": pending[0].project if pending else None,
         "prev": prev_p.strftime("%Y-%m"), "next": next_p.strftime("%Y-%m"),
-        "is_current": period == today.replace(day=1)})
+        "is_current": period == today.replace(day=1), "pccf_count": sum(f.pccf_required for f in rows)})
 
 
 def _forms(status, fin, data=None):
@@ -142,6 +143,9 @@ def mpsr_project(request, pk):
             changed = _save(project, status, fin, forms, period)
             messages.success(request, f"{project.io_number} done for {period:%B %Y}" +
                              (f" · updated {', '.join(changed)}" if changed else " · no changes"))
+            flag = pccf_flag_message(fin, project_financials(project))
+            if flag:
+                getattr(messages, flag[0])(request, flag[1])
             if "save_next" in request.POST:
                 done.add(project.pk)
                 nxt = next((i for i in order[(idx or 0) + 1:] + order[:idx or 0] if i not in done), None)
@@ -163,4 +167,6 @@ def mpsr_project(request, pk):
         "next_id": order[idx + 1] if idx is not None and idx + 1 < len(order) else None,
         "reviewed": MPSRReview.objects.filter(project=project, period=period).first(),
         "forecast_total": forecast_total, "forecast_variance": forecast_total - fin.budget_with_fee,
+        "flagged": flagged_keys(fin),
+        "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year) if fin.pccf else None,
         "done_count": len(done & set(order))})

@@ -1,5 +1,5 @@
 {% extends "tracker/base.html" %}{% load money %}
-{% block title %}MPSR {{ period|date:"F Y" }} – MBN Tracker{% endblock %}
+{% block title %}MPSR {{ period|date:"F Y" }} – IO PM Tracker{% endblock %}
 {% block content %}
 <div class="page-head">
   <div><h1>MPSR · {{ period|date:"F Y" }}</h1>
@@ -15,13 +15,14 @@
 
 <div class="panel">
   <div class="panel-head"><h2>{{ done_count }} of {{ total }} project{{ total|pluralize }} done</h2><span class="spacer"></span>
+    {% if pccf_count %}<span class="pill warn">⚠ {{ pccf_count }} project{{ pccf_count|pluralize }} need{{ pccf_count|pluralize:"s," }} a PCCF</span>{% endif %}
     {% if done_count == total and total %}<span class="pill ok">✓ All done for {{ period|date:"F" }}</span>{% endif %}</div>
   <div class="mpsr-progress"><span style="width:{{ pct|floatformat:"1u" }}%"></span></div>
 </div>
 
 <div class="tablewrap"><table>
   <thead><tr><th style="width:36px"></th><th>Project</th><th>Stage</th><th style="min-width:170px">Budget used</th>
-    <th class="n">VOW</th><th>Last comment</th><th>Overdue</th><th></th></tr></thead>
+    <th class="n">VOW</th><th>Last comment</th><th>Overdue</th><th>PCCF</th><th></th></tr></thead>
   <tbody>{% for f in rows %}
     <tr class="{% if f.reviewed_at %}mpsr-done{% endif %}">
       <td>{% if f.reviewed_at %}<span class="mark done" title="Done {{ f.reviewed_at|date:'Y-m-d H:i' }}">✓</span>{% else %}<span class="mark todo" title="Not done yet"></span>{% endif %}</td>
@@ -32,8 +33,9 @@
       <td class="n">{{ f.vow_total|money }}<div class="muted" style="font-size:11.5px">{{ f.vow.reporting_date|default:"never" }}</div></td>
       <td class="nowrap">{% if f.last_comment %}{{ f.last_comment|date:"Y-m-d" }}{% else %}<span class="muted">never</span>{% endif %}</td>
       <td>{% if f.overdue %}<span class="pill overdue">✗ {{ f.overdue }}</span>{% endif %}</td>
+      <td class="nowrap">{% if f.pccf_required %}<span class="pill warn" title="{% for r in f.pccf_reasons %}{{ r.text }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}">⚠ Required</span>{% endif %}</td>
       <td class="nowrap"><a class="btn small {% if not f.reviewed_at %}primary{% endif %}" href="/mpsr/{{ f.project.pk }}/?period={{ period|date:'Y-m' }}">{% if f.reviewed_at %}Review again{% else %}Open{% endif %}</a></td>
     </tr>
-  {% empty %}<tr><td colspan="8" class="muted">No active projects.</td></tr>{% endfor %}</tbody>
+  {% empty %}<tr><td colspan="9" class="muted">No active projects.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endblock %}

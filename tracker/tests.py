@@ -974,6 +974,68 @@ class TenderInConstructionTests(Base):
         self.assertNotContains(r, "data-tender-confirm=")     # no tick button left to press
 
 
+class RolloverTests(Base):
+    """Base project: forecast Q1 10 + Q2 20; PCCF 0 approves Q1 1,000 + Q2 2,000."""
+
+    def setUp(self):
+        super().setUp()
+        from .textutil import current_fiscal_year
+        self.fy = current_fiscal_year()
+        ProjectStatus.objects.filter(project=self.p).update(
+            fiscal_year=self.fy - 1, previous=D("100"), q1=D("10"), q2=D("20"), q3=D("0"), q4=D("0"),
+            next_year=D("1000.01"), future=D("500"))
+
+    def test_roll_one_year(self):
+        from .rollover import FIELDS, roll_one_year
+        before = {"previous": D("100"), "q1": D("10"), "q2": D("20"), "q3": D("0"), "q4": D("0"),
+                  "next_year": D("1000.01"), "future": D("500")}
+        after = roll_one_year(before)
+        self.assertEqual(after, {"previous": D("130"), "q1": D("250.00"), "q2": D("250.00"), "q3": D("250.00"),
+                                 "q4": D("250.01"), "next_year": D("500"), "future": D("0")})
+        self.assertEqual(sum(after[k] for k in FIELDS), sum(before[k] for k in FIELDS))   # total unchanged
+
+    def test_several_years_behind(self):
+        from .rollover import plan
+        ProjectStatus.objects.filter(project=self.p).update(fiscal_year=self.fy - 2)
+        p = plan([ProjectStatus.objects.get(project=self.p)])[0]
+        self.assertEqual((p.years, p.after["previous"], p.after["next_year"]), (2, D("1130.01"), D("0")))
+        self.assertEqual(p.after_year, D("500"))
+
+    def test_stale_forecast_pauses_cash_check_and_warns(self):
+        f = project_financials(Project.objects.get(pk=self.p.pk))
+        self.assertTrue(f.forecast_stale)
+        self.assertFalse(f.pccf_required)              # last year's quarters aren't compared
+        self.assertContains(self.client.get("/mpsr/"), "1 forecast is still set to last fiscal year")
+        self.assertContains(self.client.get("/"), "still set to last fiscal year")
+        r = self.client.get(f"/mpsr/{self.p.pk}/")
+        self.assertContains(r, "Move forecast forward")
+        self.assertContains(r, f"/mpsr/rollover/?project={self.p.pk}")
+
+    def test_preview_then_apply_ticked_only(self):
+        from unittest import mock
+        other = Project.objects.create(io_number="1000002", title="Paint")
+        ProjectStatus.objects.create(project=other, fiscal_year=self.fy - 1, q1=D("5"))
+        r = self.client.get("/mpsr/rollover/")
+        self.assertEqual(len(r.context["plans"]), 2)
+        self.assertEqual(ProjectStatus.objects.get(project=self.p).fiscal_year, self.fy - 1)   # preview changes nothing
+        with mock.patch("tracker.rollover.backup_database", return_value=None) as backup:
+            r = self.client.post("/mpsr/rollover/", {"project": [str(self.p.pk)], "next": "/mpsr/"}, follow=True)
+        backup.assert_called_once()
+        st = ProjectStatus.objects.get(project=self.p)
+        self.assertEqual((st.fiscal_year, st.previous, st.q4, st.next_year, st.future),
+                         (self.fy, D("130"), D("250.01"), D("500"), D("0")))
+        self.assertEqual(ProjectStatus.objects.get(project=other).fiscal_year, self.fy - 1)   # not ticked
+        self.assertTrue(StatusHistory.objects.filter(project=self.p, text__startswith="Fiscal-year rollover").exists())
+        self.assertContains(r, "1 forecast moved to FY")
+        # now current: compared with the PCCF again (approved 3,000 this year vs forecast 1,000.01)
+        self.assertTrue(project_financials(Project.objects.get(pk=self.p.pk)).pccf_required)
+
+    def test_nothing_ticked(self):
+        r = self.client.post("/mpsr/rollover/", {}, follow=True)
+        self.assertContains(r, "no projects were ticked")
+        self.assertEqual(ProjectStatus.objects.get(project=self.p).fiscal_year, self.fy - 1)
+
+
 class KPIAndApproachingTests(Base):
     """Cash flow is put in line so only the dates matter here."""
 

@@ -13,8 +13,9 @@ from django.utils import timezone
 
 from . import forms as F
 from .models import MPSRReview, Project, ProjectStatus, StatusHistory, ValueOfWork
-from .services import (approved_cash_for_year, financials, flagged_keys, milestones, pccf_flag_message,
-                       project_financials)
+from .textutil import current_fiscal_year, fiscal_label
+from .services import (approved_cash_for_year, financials, flagged_keys, forecast_is_stale, milestones,
+                       pccf_flag_message, project_financials)
 
 ZERO = Decimal("0")
 REPORTING = [Project.Status.ACTIVE, Project.Status.ON_HOLD]
@@ -61,7 +62,8 @@ def mpsr_list(request):
         "pct": (len(rows) - len(pending)) / len(rows) * 100 if rows else 0,
         "first_pending": pending[0].project if pending else None,
         "prev": prev_p.strftime("%Y-%m"), "next": next_p.strftime("%Y-%m"),
-        "is_current": period == today.replace(day=1), "pccf_count": sum(f.pccf_required for f in rows)})
+        "is_current": period == today.replace(day=1), "pccf_count": sum(f.pccf_required for f in rows),
+        "stale_count": sum(f.forecast_stale for f in rows), "fy_label": fiscal_label(current_fiscal_year(today))})
 
 
 def _forms(status, fin, data=None):
@@ -126,6 +128,33 @@ def _save(project, status, fin, forms, period):
     return changed
 
 
+def rollover(request):
+    """Preview, then move forecasts set to an earlier fiscal year forward to the current one."""
+    from . import rollover as R
+    to_year = current_fiscal_year(timezone.localdate())
+    statuses = R.stale_statuses(to_year)
+    only = request.GET.get("project")
+    if only:
+        statuses = statuses.filter(project_id=only)
+    plans = R.plan(statuses, to_year)
+    if request.method == "POST":
+        chosen = {int(x) for x in request.POST.getlist("project") if x.isdigit()}
+        picked = [p for p in plans if p.project.pk in chosen]
+        if not picked:
+            messages.error(request, "Nothing rolled forward: no projects were ticked.")
+            return redirect(request.get_full_path())
+        backup = R.backup_database("rollover")
+        R.apply(picked)
+        messages.success(request, f"{len(picked)} forecast{'s' if len(picked) != 1 else ''} moved to "
+                                  f"FY {fiscal_label(to_year)}." +
+                                  (f" A backup was saved first: backups\\{backup.name}" if backup else ""))
+        nxt = request.POST.get("next", "")
+        return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else "/mpsr/")
+    return render(request, "tracker/rollover.html", {
+        "plans": plans, "to_label": fiscal_label(to_year), "only": only,
+        "next": request.GET.get("next", "")})
+
+
 def mpsr_project(request, pk):
     period = _period(request)
     project = get_object_or_404(Project.objects.select_related("building"), pk=pk)
@@ -167,6 +196,7 @@ def mpsr_project(request, pk):
         "next_id": order[idx + 1] if idx is not None and idx + 1 < len(order) else None,
         "reviewed": MPSRReview.objects.filter(project=project, period=period).first(),
         "forecast_total": forecast_total, "forecast_variance": forecast_total - fin.budget_with_fee,
-        "flagged": flagged_keys(fin),
-        "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year) if fin.pccf else None,
+        "flagged": flagged_keys(fin), "current_fy": current_fiscal_year(today),
+        "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year)
+        if fin.pccf and not forecast_is_stale(status) else None,
         "done_count": len(done & set(order))})

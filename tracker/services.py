@@ -72,6 +72,13 @@ def approved_cash_for_year(pccf, fiscal_year):
     return None
 
 
+def forecast_is_stale(status, today=None):
+    """The MPSR forecast is set to an earlier fiscal year than the one we're in (needs the rollover)."""
+    from .textutil import current_fiscal_year
+    return bool(status and status.fiscal_year and
+                status.fiscal_year < current_fiscal_year(today or timezone.localdate()))
+
+
 def _reporting(project):
     return project.status in (Project.Status.ACTIVE, Project.Status.ON_HOLD)
 
@@ -87,7 +94,8 @@ def pccf_reasons(project, pccf, status, kpi_failures=()):
     out = []
     approved = approved_cash_for_year(pccf, status.fiscal_year)
     forecast = status.current_year_forecast
-    if approved is not None and abs(forecast - approved) >= CASH_TOLERANCE:
+    # a forecast still set to an earlier fiscal year is about last year: roll it forward before comparing
+    if approved is not None and not forecast_is_stale(status) and abs(forecast - approved) >= CASH_TOLERANCE:
         fy = status.fiscal_year_label or pccf.fiscal_year_label
         out.append(PCCFReason("cash", f"FY {fy} cash flow" if fy else "This year's cash flow", approved, forecast))
     for field, label in PCCF_DATES:
@@ -172,6 +180,10 @@ class Financials:
     @property
     def pccf_required(self):
         return bool(self.pccf_reasons)
+
+    @property
+    def forecast_stale(self):
+        return _reporting(self.project) and forecast_is_stale(self.status)
 
     @property
     def budget_with_fee(self):

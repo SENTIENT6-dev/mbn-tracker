@@ -173,8 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const cellFmt = n => { const r = Math.round(n); const t = '$' + Math.abs(r).toLocaleString('en-CA'); return r < 0 ? `(${t})` : t; };
   // what the PCCF approved for the chosen fiscal year (same rule as the server's PCCF check)
+  const currentFy = {{ current_fy }};
   const approvedFor = fy => {
     const d = fyPill.dataset, pfy = parseInt(d.pccfFy, 10);
+    if (fy && fy < currentFy) return null;    // last year's forecast: not compared until moved forward
     if (!fy || isNaN(pfy) || pfy === fy) return parseFloat(d.pccfYear);
     if (pfy === fy - 1) return parseFloat(d.pccfNext);
     return null;

@@ -12,6 +12,7 @@ urlpatterns = [
     path("calendar/", v.calendar_view, name="calendar"),
     path("mpsr/", mp.mpsr_list, name="mpsr"),
     path("mpsr/<int:pk>/", mp.mpsr_project, name="mpsr_project"),
+    path("mpsr/rollover/", mp.rollover, name="rollover"),
 
     # projects
     path("projects/", v.dashboard, name="projects"),

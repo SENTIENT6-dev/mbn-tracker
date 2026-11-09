@@ -1,4 +1,14 @@
 {# "PCCF required" and "approaching target" banners. Needs: fin (Financials) #}
+{% if fin.forecast_stale %}
+<div class="pccf-flag" role="status">
+  <div class="what">
+    <strong>📅 The forecast is still set to FY {{ fin.status.fiscal_year_label }}</strong>
+    <div style="font-size:13px;color:var(--ink)">Move it forward to the current fiscal year: last year's quarters go into previous years, and next year becomes this year.
+      Cash flow isn't checked against the PCCF until then.</div>
+  </div>
+  <a class="btn primary" href="/mpsr/rollover/?project={{ fin.project.pk }}&next={{ request.get_full_path|urlencode }}">Move forecast forward</a>
+</div>
+{% endif %}
 {% if fin.approaching %}
 <div class="target-flag" role="status">
   <strong>⏱ Approaching target date</strong>

@@ -7,6 +7,7 @@
   <a class="btn primary" href="/projects/new/">+ New project</a>
 </div>
 
+{% include "tracker/_rollover_banner.html" %}
 {% if open_issues %}<div class="banner">{{ open_issues }} data issue{{ open_issues|pluralize }} need{{ open_issues|pluralize:"s," }} a decision. <a href="/issues/">Review</a></div>{% endif %}
 
 <div class="tiles">

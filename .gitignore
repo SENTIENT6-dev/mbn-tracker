@@ -1,6 +1,7 @@
 # Real data never goes in the repo
 *.sqlite3
 *.sqlite3-journal
+backups/
 *.accdb
 *.mdb
 *.xlsx

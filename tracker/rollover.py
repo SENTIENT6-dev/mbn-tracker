@@ -1,0 +1,133 @@
+"""Fiscal-year rollover of the MPSR cash-flow forecast.
+
+Forecasts are kept per fiscal year (April to March). When a new fiscal year starts, each project's forecast
+moves forward one year:
+
+    Previous years  <- previous years + last year's Q1-Q4
+    Q1-Q4           <- last year's "next year", split evenly (cents left over go to Q4)
+    Next year       <- last year's "future"
+    Future          <- 0
+
+The total stays the same. A forecast more than one year behind is moved forward one year at a time.
+"""
+import datetime as dt
+import sqlite3
+from dataclasses import dataclass
+from decimal import Decimal
+from pathlib import Path
+
+from django.conf import settings
+from django.db import connection, transaction
+from django.utils import timezone
+
+from .models import Project, ProjectStatus, StatusHistory
+from .textutil import current_fiscal_year, fiscal_label
+
+ZERO = Decimal("0")
+CENT = Decimal("0.01")
+FIELDS = ["previous", "q1", "q2", "q3", "q4", "next_year", "future"]
+REPORTING = [Project.Status.ACTIVE, Project.Status.ON_HOLD]
+
+
+def roll_one_year(values):
+    """values: dict of FIELDS -> Decimal. Returns the same shape, one fiscal year later."""
+    v = {k: values[k] or ZERO for k in FIELDS}
+    quarter = (v["next_year"] / 4).quantize(CENT)
+    return {
+        "previous": v["previous"] + v["q1"] + v["q2"] + v["q3"] + v["q4"],
+        "q1": quarter, "q2": quarter, "q3": quarter,
+        "q4": v["next_year"] - quarter * 3,
+        "next_year": v["future"],
+        "future": ZERO,
+    }
+
+
+@dataclass
+class Plan:
+    status: ProjectStatus
+    from_year: int
+    to_year: int
+    before: dict
+    after: dict
+
+    @property
+    def project(self):
+        return self.status.project
+
+    @property
+    def years(self):
+        return self.to_year - self.from_year
+
+    @property
+    def from_label(self):
+        return fiscal_label(self.from_year)
+
+    @property
+    def to_label(self):
+        return fiscal_label(self.to_year)
+
+    @property
+    def before_year(self):
+        return sum((self.before[q] for q in ("q1", "q2", "q3", "q4")), ZERO)
+
+    @property
+    def after_year(self):
+        return sum((self.after[q] for q in ("q1", "q2", "q3", "q4")), ZERO)
+
+
+def stale_statuses(to_year=None):
+    """Forecasts of active / on-hold projects that are set to an earlier fiscal year than `to_year`."""
+    to_year = to_year or current_fiscal_year(timezone.localdate())
+    return (ProjectStatus.objects.select_related("project")
+            .filter(project__status__in=REPORTING, fiscal_year__lt=to_year)
+            .order_by("project__io_number"))
+
+
+def plan(statuses, to_year=None):
+    to_year = to_year or current_fiscal_year(timezone.localdate())
+    out = []
+    for st in statuses:
+        if st.fiscal_year is None or st.fiscal_year >= to_year:
+            continue
+        before = {k: getattr(st, k) for k in FIELDS}
+        after = before
+        for _ in range(to_year - st.fiscal_year):
+            after = roll_one_year(after)
+        out.append(Plan(st, st.fiscal_year, to_year, before, after))
+    return out
+
+
+def backup_database(label="rollover"):
+    """Copy the SQLite database into backups/ before a bulk change. Returns the file path (None if not SQLite)."""
+    db = settings.DATABASES["default"]
+    if db["ENGINE"] != "django.db.backends.sqlite3":
+        return None
+    folder = Path(settings.BASE_DIR) / "backups"
+    folder.mkdir(exist_ok=True)
+    target = folder / f"db-before-{label}-{dt.datetime.now():%Y%m%d-%H%M%S}.sqlite3"
+    connection.ensure_connection()
+    dest = sqlite3.connect(str(target))
+    try:
+        connection.connection.backup(dest)   # safe while the app is running
+    finally:
+        dest.close()
+    return target
+
+
+def apply(plans):
+    """Write the rolled-forward forecasts and log each one in the project's history."""
+    now = timezone.now()
+    with transaction.atomic():
+        for p in plans:
+            st = ProjectStatus.objects.select_for_update().get(pk=p.status.pk)
+            if st.fiscal_year != p.from_year:      # changed since the preview: leave it alone
+                continue
+            for k, v in p.after.items():
+                setattr(st, k, v)
+            st.fiscal_year = p.to_year
+            st.save()
+            StatusHistory.objects.create(
+                project=st.project, kind=StatusHistory.Kind.CASH_FLOW, changed_at=now,
+                text=f"Fiscal-year rollover: forecast moved from FY {p.from_label} to FY {p.to_label}",
+                data={"fiscal_year": p.to_year, **{k: float(v) for k, v in p.after.items()},
+                      "rolled_from": {"fiscal_year": p.from_year, **{k: float(v) for k, v in p.before.items()}}})

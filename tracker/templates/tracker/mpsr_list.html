@@ -13,6 +13,8 @@
   {% if first_pending %}<a class="btn primary" href="/mpsr/{{ first_pending.pk }}/?period={{ period|date:'Y-m' }}">{% if done_count %}Continue{% else %}Start MPSR{% endif %} →</a>{% endif %}
 </div>
 
+{% include "tracker/_rollover_banner.html" %}
+
 <div class="panel">
   <div class="panel-head"><h2>{{ done_count }} of {{ total }} project{{ total|pluralize }} done</h2><span class="spacer"></span>
     {% if pccf_count %}<span class="pill warn">⚠ {{ pccf_count }} project{{ pccf_count|pluralize }} need{{ pccf_count|pluralize:"s," }} a PCCF</span>{% endif %}

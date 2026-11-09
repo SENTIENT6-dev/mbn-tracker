@@ -1,0 +1,56 @@
+{% extends "tracker/base.html" %}{% load money %}
+{% block title %}Roll forecasts to FY {{ to_label }} – IO PM Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="ink2" style="font-size:13px"><a href="/mpsr/">MPSR</a> › Fiscal-year rollover</div>
+    <h1>Move forecasts to FY {{ to_label }}</h1>
+    <div class="sub">{{ plans|length }} project{{ plans|pluralize }} still {{ plans|length|pluralize:"has its,have their" }} forecast set to an earlier fiscal year.</div></div>
+</div>
+
+{% if plans %}
+<div class="panel">
+  <div class="panel-head"><h2>What happens</h2></div>
+  <ul style="margin:0;padding-left:18px;line-height:1.7">
+    <li>Last year's <strong>Q1–Q4</strong> are added to <strong>Previous years</strong>.</li>
+    <li>Last year's <strong>Next year</strong> becomes this year's Q1–Q4, split evenly. Adjust the quarters in the MPSR.</li>
+    <li>Last year's <strong>Future</strong> becomes <strong>Next year</strong>, and Future starts at $0.</li>
+    <li>The total forecast doesn't change. Each change is logged in the project's history, and the database is backed up first.</li>
+  </ul>
+</div>
+
+<form method="post">{% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <div class="tablewrap"><table class="rollover">
+    <thead><tr>
+      <th style="width:34px"><input type="checkbox" checked aria-label="Tick all" data-tick-all></th>
+      <th>Project</th><th>Fiscal year</th>
+      <th class="n">Previous years</th><th class="n">This FY (Q1–Q4)</th><th class="n">Next year</th><th class="n">Future</th>
+    </tr></thead>
+    <tbody>{% for p in plans %}
+      <tr>
+        <td><input type="checkbox" name="project" value="{{ p.project.pk }}" checked aria-label="Roll {{ p.project.io_number }}"></td>
+        <td><a href="/mpsr/{{ p.project.pk }}/"><strong>{{ p.project.io_number }}</strong></a>
+          <div class="ink2" style="font-size:12.5px">{{ p.project.title|truncatechars:40 }}</div></td>
+        <td class="nowrap">{{ p.from_label }} → <strong>{{ p.to_label }}</strong>{% if p.years > 1 %}<div class="muted" style="font-size:11.5px">{{ p.years }} years</div>{% endif %}</td>
+        <td class="n"><span class="was">{{ p.before.previous|money:2 }}</span>{{ p.after.previous|money:2 }}</td>
+        <td class="n"><span class="was">{{ p.before_year|money:2 }}</span>{{ p.after_year|money:2 }}</td>
+        <td class="n"><span class="was">{{ p.before.next_year|money:2 }}</span>{{ p.after.next_year|money:2 }}</td>
+        <td class="n"><span class="was">{{ p.before.future|money:2 }}</span>{{ p.after.future|money:2 }}</td>
+      </tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="muted" style="font-size:12.5px">Grey figures are the current forecast; black figures are after the rollover.</p>
+  <div style="display:flex;gap:10px;align-items:center;margin-top:12px">
+    <button class="btn primary">Roll ticked forecasts to FY {{ to_label }}</button>
+    <a class="btn" href="{{ next|default:'/mpsr/' }}">Cancel</a>
+  </div>
+</form>
+<script>
+document.querySelector('[data-tick-all]').addEventListener('change', e =>
+  document.querySelectorAll('input[name=project]').forEach(b => b.checked = e.target.checked));
+</script>
+{% else %}
+<div class="panel"><p style="margin:0">Every active project's forecast is already set to FY {{ to_label }}. Nothing to roll forward.</p>
+  <p style="margin:10px 0 0"><a class="btn" href="/mpsr/">Back to MPSR</a></p></div>
+{% endif %}
+{% endblock %}

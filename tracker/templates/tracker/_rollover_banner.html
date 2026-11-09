@@ -1,0 +1,10 @@
+{# Needs: stale_count, fy_label #}
+{% if stale_count %}
+<div class="pccf-flag" role="status">
+  <div class="what">
+    <strong>📅 {{ stale_count }} forecast{{ stale_count|pluralize }} {{ stale_count|pluralize:"is,are" }} still set to last fiscal year</strong>
+    <div style="font-size:13px;color:var(--ink)">It's FY {{ fy_label }} now. Move them forward so this year's cash flow is compared with the approved PCCFs.</div>
+  </div>
+  <a class="btn primary" href="/mpsr/rollover/?next={{ request.get_full_path|urlencode }}">Review and move to FY {{ fy_label }}</a>
+</div>
+{% endif %}

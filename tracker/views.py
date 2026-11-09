@@ -11,10 +11,11 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import forms as F
+from .textutil import current_fiscal_year, fiscal_label
 from .models import (PCCF, ChangeOrder, DataIssue, Invoice, KPIFailure, MPSRReview, Project, ProjectStatus,
                      PurchaseOrder, StageGate, StatusHistory, ValueOfWork)
 from .operations import save_change_order
-from .services import (approved_cash_for_year, financials, flagged_keys, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
+from .services import (approved_cash_for_year, financials, flagged_keys, forecast_is_stale, invoice_room, milestones, pccf_flag_message, po_rows, project_financials,
                        resolve_schedule_issue, schedule_health)
 
 ZERO = Decimal("0")
@@ -105,6 +106,7 @@ def overview(request):
         "pccf_rows": [f for f in sorted(rows, key=lambda f: f.project.io_number) if f.pccf_required][:6],
         "approaching": sorted(((w, f) for f in rows for w in f.approaching), key=lambda x: x[0].days),
         "kpi_count": sum(len(f.kpi_failures) for f in rows),
+        "stale_count": sum(f.forecast_stale for f in rows), "fy_label": fiscal_label(current_fiscal_year(today)),
         "committed_pct": committed_pct, "invoiced_pct": invoiced_pct,
         "open_cos": ChangeOrder.objects.filter(status__in=["requested", "approved"]).count(),
         "mpsr_done": MPSRReview.objects.filter(period=today.replace(day=1), project__in=projects).count(),
@@ -243,7 +245,8 @@ def project_detail(request, pk):
         "project": project, "status": status, "fin": fin, "pos": pos, "tab": tab,
         "stepper": stepper, "timeline": timeline, "years": years, "today_pos": at(today),
         "quarters": quarters, "cash_top": top, "flagged": flagged_keys(fin),
-        "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year) if fin.pccf else None,
+        "approved_year": approved_cash_for_year(fin.pccf, status.fiscal_year)
+        if fin.pccf and not forecast_is_stale(status) else None,
         "pccfs": pccfs, "has_charter": any(p.submission == 0 for p in pccfs),
         "change_orders": ChangeOrder.objects.filter(po__project=project).select_related("po__vendor"),
         "history": project.status_history.all()[:100],

@@ -1,4 +1,4 @@
-{% if c.status == 'requested' %}<span class="pill warn">● Requested</span>
+{% if c.status == 'requested' %}<span class="pill warn">● Pending approval</span>
 {% elif c.status == 'approved' %}<span class="pill blue">◆ Approved – process into PO</span>
 {% elif c.status == 'processed' %}<span class="pill ok">✓ Processed</span>
 {% else %}<span class="pill none">✕ Rejected</span>{% endif %}

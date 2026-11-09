@@ -342,7 +342,7 @@ class ChangeOrder(models.Model):
     """A change to a PO. The project always comes from the PO, so they can't disagree."""
 
     class State(models.TextChoices):
-        REQUESTED = "requested", "Requested (not approved)"
+        REQUESTED = "requested", "Pending approval"
         APPROVED = "approved", "Approved, PO not yet revised"
         PROCESSED = "processed", "Processed into PO"
         REJECTED = "rejected", "Rejected"

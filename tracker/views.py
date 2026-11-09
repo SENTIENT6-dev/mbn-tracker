@@ -603,8 +603,11 @@ def po_form(request, number=None):
 
 
 def pending_changes(request):
-    cos = ChangeOrder.objects.filter(status__in=[ChangeOrder.State.REQUESTED, ChangeOrder.State.APPROVED]) \
-        .select_related("po__project", "po__vendor")
+    cos = list(ChangeOrder.objects.filter(status__in=[ChangeOrder.State.REQUESTED, ChangeOrder.State.APPROVED])
+               .select_related("po__project", "po__vendor"))
+    rooms = po_room({c.po.project for c in cos})          # shown in the "Approve?" confirmation
+    for c in cos:
+        c.room = rooms.get(c.po.project_id)
     return render(request, "tracker/pending.html", {"change_orders": cos})
 
 

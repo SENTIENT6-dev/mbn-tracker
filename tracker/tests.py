@@ -1079,15 +1079,25 @@ class POBudgetLimitTests(Base):
 class ChangeOrderBudgetTests(Base):
     """$65,000 of budget left (see POBudgetLimitTests)."""
 
-    def test_new_approved_change_order_limited(self):
+    def test_new_change_orders_always_start_pending(self):
         url = "/pos/222/"
-        r = self.client.post(url, {"co-description": "Extra", "co-value": "65000.01", "co-status": "approved"})
-        self.assertContains(r, "Not enough budget: this change order adds $65,000.01")
-        self.assertFalse(ChangeOrder.objects.exists())
-        self.client.post(url, {"co-description": "Asked", "co-value": "90000", "co-status": "requested"})
-        self.assertTrue(ChangeOrder.objects.filter(status="requested").exists())   # requests don't count yet
-        self.client.post(url, {"co-description": "Credit", "co-value": "-5000", "co-status": "approved"})
-        self.assertTrue(ChangeOrder.objects.filter(value=D("-5000")).exists())    # credits always fine
+        r = self.client.get(url)
+        self.assertNotIn("status", r.context["co_form"].fields)          # no status box
+        self.client.post(url, {"co-description": "Extra", "co-value": "90000", "co-status": "approved"})
+        co = ChangeOrder.objects.get()
+        self.assertEqual(co.status, "requested")                          # a posted status is ignored
+        self.assertEqual(co.get_status_display(), "Pending approval")
+        self.assertEqual(project_financials(self.p).pending, D("0"))      # pending doesn't count yet
+
+    def test_approve_button_asks_first(self):
+        ChangeOrder.objects.create(po=self.po2, description="Extra", value=D("1000"), status="requested")
+        r = self.client.get("/change-orders/")
+        self.assertContains(r, 'data-dialog-title="Approve this change order?"')
+        self.assertContains(r, 'data-dialog-title="Reject this change order?"')
+        self.assertContains(r, "budget, which has $65,000.00 left")
+        self.assertContains(r, "● Pending approval")
+        self.assertNotIn("status", self.client.get(f"/change-orders/{ChangeOrder.objects.get().pk}/edit/")
+                         .context["form"].fields)                        # edit can't change status either
 
     def test_approving_and_editing_checked(self):
         co = ChangeOrder.objects.create(po=self.po2, description="Big", value=D("70000"), status="requested")

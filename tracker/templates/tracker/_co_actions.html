@@ -1,9 +1,19 @@
+{# Buttons for a change order. Needs: c (ChangeOrder, optional c.room = project budget room), next #}
+{% load money %}
 {% if c.status == 'requested' %}
-<form method="post" action="/change-orders/{{ c.pk }}/approve/" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><button class="btn small">Approve</button></form>
+<form method="post" action="/change-orders/{{ c.pk }}/approve/" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+  <button class="btn small primary" type="submit"
+          data-dialog-title="Approve this change order?"
+          data-dialog-text="“{{ c.description }}” for {{ c.value|money:2 }} on PO {{ c.po.number }} ({{ c.po.vendor }}).{% if c.room and c.room.has_budget %} Once approved it counts against project {{ c.po.project.io_number }}’s budget, which has {{ c.room.available|money:2 }} left.{% endif %}"
+          data-dialog-ok="Approve">Approve</button></form>
 {% endif %}
 {% if c.status == 'approved' %}
 <form method="post" action="/change-orders/{{ c.pk }}/process/" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><button class="btn small primary" data-confirm="Add {{ c.value|floatformat:'2g' }} to PO {{ c.po.number }}? Click again">Process into PO</button></form>
 {% endif %}
 {% if c.status == 'requested' or c.status == 'approved' %}
-<form method="post" action="/change-orders/{{ c.pk }}/reject/" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><button class="btn small">Reject</button></form>
+<form method="post" action="/change-orders/{{ c.pk }}/reject/" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+  <button class="btn small" type="submit"
+          data-dialog-title="Reject this change order?"
+          data-dialog-text="“{{ c.description }}” for {{ c.value|money:2 }} on PO {{ c.po.number }} ({{ c.po.vendor }}).{% if c.status == 'approved' %} It's approved now, so rejecting it takes it out of the project's commitments.{% endif %} It will leave this list."
+          data-dialog-ok="Reject" data-dialog-danger="1">Reject</button></form>
 {% endif %}

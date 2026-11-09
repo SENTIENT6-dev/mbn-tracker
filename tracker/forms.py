@@ -345,18 +345,17 @@ class InvoiceEditForm(DateFieldsMixin, forms.ModelForm):
 class ChangeOrderEditForm(forms.ModelForm):
     class Meta:
         model = ChangeOrder
-        fields = ["description", "value", "status", "folder_link", "comment"]
-        help_texts = {"status": "Setting it to Processed adds the value to the PO; changing a processed one "
-                                "adjusts the PO by the difference."}
+        # status isn't edited here: it changes only through Approve / Process / Reject on the Change orders page
+        fields = ["description", "value", "folder_link", "comment"]
+        help_texts = {"value": "Changing the value of a processed change order adjusts the PO by the difference."}
 
     def clean(self):
-        """Raising what counts against the budget (a bigger value, or approving it) must fit the budget."""
+        """Raising the value of an approved or processed change order must still fit the budget."""
         from .services import co_budget_error, co_counted
         data = super().clean()
         if self.instance.pk and data.get("value") is not None:
             old = ChangeOrder.objects.select_related("po__project").get(pk=self.instance.pk)
-            err = co_budget_error(old.po, co_counted(old.value, old.status),
-                                  co_counted(data["value"], data.get("status")))
+            err = co_budget_error(old.po, co_counted(old.value, old.status), co_counted(data["value"], old.status))
             if err:
                 self.add_error("value", err)
         return data
@@ -552,25 +551,15 @@ class NewInvoiceForm(InvoiceForm):
 
 
 class ChangeOrderForm(forms.ModelForm):
+    """A new change order always starts pending approval; it's approved later on the Change orders page."""
     class Meta:
         model = ChangeOrder
-        fields = ["description", "value", "status", "folder_link", "comment"]
+        fields = ["description", "value", "folder_link", "comment"]
 
     def __init__(self, *args, po=None, **kwargs):
         self.po = po
         super().__init__(*args, **kwargs)
-        self.fields["status"].choices = [c for c in ChangeOrder.State.choices
-                                         if c[0] != ChangeOrder.State.PROCESSED]
-
-    def clean(self):
-        """An approved change order can't take the project past its budget (excluding the fee)."""
-        from .services import co_budget_error, co_counted
-        data = super().clean()
-        if self.po is not None and data.get("value") is not None:
-            err = co_budget_error(self.po, Decimal("0"), co_counted(data["value"], data.get("status")))
-            if err:
-                self.add_error("value", err)
-        return data
+        self.instance.status = ChangeOrder.State.REQUESTED
 
 
 class CashFlowForm(FiscalYearMixin, forms.ModelForm):

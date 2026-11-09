@@ -432,6 +432,41 @@ details>summary::-webkit-details-marker{display:none}
   {% block content %}{% endblock %}
 </main>
 <div id="tip" role="tooltip"></div>
+<dialog class="confirm" id="ask-confirm" aria-labelledby="ac-title">
+  <form method="dialog">
+    <h2 id="ac-title"></h2>
+    <p id="ac-text"></p>
+    <div class="acts">
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn primary" value="ok" id="ac-ok">OK</button>
+    </div>
+  </form>
+</dialog>
+<script>
+// Buttons with data-dialog-title ask for confirmation in a pop-up before their form is sent.
+(function(){
+  const dlg = document.getElementById('ask-confirm');
+  if (!dlg || !dlg.showModal) return;          // very old browser: the button just submits
+  let pending = null;
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button[data-dialog-title]');
+    if (!b) return;
+    e.preventDefault();
+    pending = b.form;
+    document.getElementById('ac-title').textContent = b.dataset.dialogTitle;
+    document.getElementById('ac-text').textContent = b.dataset.dialogText || '';
+    document.getElementById('ac-ok').textContent = b.dataset.dialogOk || 'OK';
+    document.getElementById('ac-ok').className = 'btn ' + (b.dataset.dialogDanger ? 'danger' : 'primary');
+    dlg.returnValue = '';
+    dlg.showModal();
+    document.getElementById('ac-ok').focus();
+  });
+  dlg.addEventListener('close', () => {
+    if (dlg.returnValue === 'ok' && pending) pending.submit();
+    pending = null;
+  });
+})();
+</script>
 <dialog class="confirm" id="tender-confirm" aria-labelledby="tc-title">
   <form method="dialog">
     <h2 id="tc-title">Mark tender as issued?</h2>

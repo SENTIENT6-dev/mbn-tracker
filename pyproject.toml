@@ -1,7 +1,7 @@
 # Linting with Ruff:  .venv\Scripts\ruff check .        (add --fix to fix what it can)
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py311"
 extend-exclude = ["tracker/migrations", "staticfiles", "backups"]
 
 [tool.ruff.lint]
@@ -11,6 +11,7 @@ select = ["E", "W", "F", "I", "B", "UP", "DJ", "C4", "SIM"]
 ignore = [
     "DJ001",   # null=True on CharField: the Access import relies on it in a few places
     "SIM108",  # ternary instead of if/else: not always clearer
+    "UP038",   # isinstance(x, A | B): deprecated by Ruff itself; tuples are fine
 ]
 
 [tool.ruff.lint.per-file-ignores]

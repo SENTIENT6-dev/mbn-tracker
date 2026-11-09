@@ -35,7 +35,7 @@ class Command(BaseCommand):
         cols = [c[0] for c in cur.description]
         access = {}
         for r in cur.fetchall():
-            access.setdefault(r[cols.index("IO_ProjNum")], []).append(dict(zip(cols, r)))
+            access.setdefault(r[cols.index("IO_ProjNum")], []).append(dict(zip(cols, r, strict=False)))
         conn.close()
         shutil.rmtree(tmp.parent, ignore_errors=True)
 

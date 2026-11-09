@@ -258,7 +258,7 @@ def project_detail(request, pk):
         timeline.append(row)
 
     pccfs = list(project.pccfs.order_by("submission"))
-    for prev, cur in zip([None] + pccfs, pccfs):
+    for prev, cur in zip([None] + pccfs, pccfs, strict=False):
         cur.change = cur.total_budget - prev.total_budget if prev else None
     pccfs.reverse()
     years = [{"label": y, "pos": at(date(y, 1, 1))} for y in range(lo.year + 1, hi.year + 1)]

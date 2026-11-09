@@ -9,6 +9,7 @@ tracker/management/commands/_local_fixes.py
 
 # Local environment
 .venv/
+.venv-*/
 __pycache__/
 *.pyc
 staticfiles/

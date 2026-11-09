@@ -158,7 +158,7 @@ class Command(BaseCommand):
     def rows(self, sql):
         self.cur.execute(sql)
         cols = [c[0] for c in self.cur.description]
-        return [dict(zip(cols, r)) for r in self.cur.fetchall()]
+        return [dict(zip(cols, r, strict=False)) for r in self.cur.fetchall()]
 
     def issue(self, category, severity, summary, detail=None, project=None):
         self.issues.append(ImportIssue(category=category, severity=severity, summary=summary,

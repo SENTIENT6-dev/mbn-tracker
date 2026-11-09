@@ -35,7 +35,7 @@ Settings for any server (environment variables):
 
 ## Giving a copy to another PM
 1. Copy this folder **without** `db.sqlite3`, `db.backup-*.sqlite3` and `.venv`.
-2. On their PC (Python 3.9+ installed): double-click `install.bat` once.
+2. On their PC (Python 3.11 installed): double-click `install.bat` once.
 3. Double-click `start.bat`. The tracker asks for their name and details, then for the Access file.
    With *Only projects where I'm the project manager* ticked, a shared team Access file gives them just their
    projects. (Records of projects that were deleted in Access have no PM, so they're left out in that mode.)

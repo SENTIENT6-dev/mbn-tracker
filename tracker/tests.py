@@ -1232,7 +1232,7 @@ class MonthlyReportTests(Base):
         from .models import MPSRReview, StageGate
         design = StageGate.objects.create(name="99% Design", order=4)
         tender = StageGate.objects.create(name="Tender", order=5)
-        when = dt.datetime(2026, 11, 3, 10, tzinfo=dt.timezone.utc)
+        when = dt.datetime(2026, 11, 3, 10, tzinfo=dt.UTC)
         StatusHistory.objects.create(project=self.p, kind="actuals", changed_at=when - dt.timedelta(days=40),
                                      data={"stage": design.name})
         StatusHistory.objects.create(project=self.p, kind="actuals", changed_at=when, data={"stage": tender.name})

@@ -132,7 +132,7 @@ Actual: {{ t.e.actual }}">✓</span>{% endif %}
 </div>
 
 <div class="grid g2">
-  <div class="panel">
+  <div class="panel" id="cash-flow">
     <div class="panel-head"><h2>Cash flow{% if status.fiscal_year %} · FY {{ status.fiscal_year_label }}{% endif %}</h2><span class="spacer"></span>
       <div class="legend"><span><i style="background:var(--s1)"></i>Approved (PCCF)</span><span><i style="background:var(--s2)"></i>Forecast</span><span><i style="background:var(--s3)"></i>Actual</span></div></div>
     {% if spend.underspent %}

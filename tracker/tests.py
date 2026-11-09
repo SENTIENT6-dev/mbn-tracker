@@ -1067,6 +1067,14 @@ class MonthlyReportTests(Base):
         self.assertContains(r, "Print / Save as PDF")
         self.assertEqual(self.client.get("/reports/monthly/?period=2026-10").context["r"].stage_changes, [])
 
+        # needs a decision: project + short linked issues, not the full detail
+        rows = rep.action_rows
+        self.assertEqual([row.project.pk for row, _ in rows], [self.p.pk])
+        pccf = next(i for i in rows[0][1] if i.label.startswith("⚠ PCCF"))
+        self.assertEqual((pccf.label, pccf.url), ("⚠ PCCF: cash flow", f"/mpsr/{self.p.pk}/#mpsr-cash"))
+        self.assertContains(r, f'href="/mpsr/{self.p.pk}/#mpsr-cash"')
+        self.assertNotContains(r, "FY  cash flow: forecast")             # the long reason text isn't on the page
+
         x = self.client.get("/reports/monthly.xlsx?period=2026-11")
         self.assertIn("Monthly report 2026-11.xlsx", x["Content-Disposition"])
         wb = load_workbook(BytesIO(x.content))

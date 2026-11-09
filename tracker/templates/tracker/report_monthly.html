@@ -7,6 +7,8 @@
 .report table td,.report table th{vertical-align:top}
 .report .act-list{margin:0;padding-left:18px;font-size:13px}
 .report .act-list li{margin-bottom:3px}
+.report table.issues a.pill{text-decoration:none}
+.report table.issues a.pill:hover{filter:brightness(.95);text-decoration:underline}
 .report .comment{font-size:12.5px;white-space:pre-line;color:var(--ink)}
 .report .meta{font-size:12.5px;color:var(--ink-2)}
 @media print{
@@ -56,36 +58,20 @@
 </div>
 
 <h2 class="sec">Needs a decision</h2>
-<div class="grid g2">
-  <div class="panel">
-    <div class="panel-head"><h2>PCCF required ({{ r.pccf_rows|length }})</h2></div>
-    {% for row in r.pccf_rows %}
-      <div style="margin-bottom:8px"><strong>{{ row.project.io_number }}</strong> <span class="meta">{{ row.project.title }}</span>
-        <ul class="act-list">{% for x in row.fin.pccf_reasons %}<li>{{ x.text }}</li>{% endfor %}</ul></div>
-    {% empty %}<p class="muted">None: every forecast matches its approved PCCF.</p>{% endfor %}
-  </div>
-  <div class="panel">
-    <div class="panel-head"><h2>KPI issues ({{ r.kpi_issue_count }})</h2></div>
-    {% for row in r.kpi_issue_rows %}
-      <div style="margin-bottom:8px"><strong>{{ row.project.io_number }}</strong> <span class="meta">{{ row.project.title }}</span>
-        <ul class="act-list">{% for i in row.fin.kpi_issues %}<li>{{ i.text }}</li>{% endfor %}</ul></div>
-    {% empty %}<p class="muted">None.</p>{% endfor %}
-  </div>
-  <div class="panel">
-    <div class="panel-head"><h2>Approaching targets, next 15 days ({{ r.approaching|length }})</h2></div>
-    <ul class="act-list">{% for w, f in r.approaching %}<li><strong>{{ f.project.io_number }}</strong> {{ w.text }}</li>
-    {% empty %}<li class="muted" style="list-style:none;margin-left:-18px">None.</li>{% endfor %}</ul>
-  </div>
-  <div class="panel">
-    <div class="panel-head"><h2>Budget</h2></div>
-    <p class="meta" style="margin:0 0 4px">Over budget ({{ r.over_budget_rows|length }})</p>
-    <ul class="act-list">{% for row in r.over_budget_rows %}<li><strong>{{ row.project.io_number }}</strong> {{ row.project.title|truncatechars:50 }}: over by {{ row.fin.remaining_budget|abs|money }}</li>
-    {% empty %}<li class="muted" style="list-style:none;margin-left:-18px">None.</li>{% endfor %}</ul>
-    <p class="meta" style="margin:10px 0 4px">Under-spent so far this year ({{ r.underspent_rows|length }})</p>
-    <ul class="act-list">{% for row in r.underspent_rows %}<li><strong>{{ row.project.io_number }}</strong> {{ row.project.title|truncatechars:50 }}</li>
-    {% empty %}<li class="muted" style="list-style:none;margin-left:-18px">None.</li>{% endfor %}</ul>
-  </div>
-</div>
+<p class="meta no-print" style="margin:-4px 0 10px">Click an issue to go to where it's fixed. Hover for the detail.</p>
+{% with actions=r.action_rows %}
+{% if actions %}
+<div class="tablewrap"><table class="compact issues">
+  <thead><tr><th style="width:260px">Project</th><th>Issues</th></tr></thead>
+  <tbody>{% for row, items in actions %}
+    <tr><td><a href="/mpsr/{{ row.project.pk }}/"><strong>{{ row.project.io_number }}</strong></a>
+        <span class="meta">{{ row.project.title|truncatechars:34 }}</span></td>
+      <td><div class="flags">{% for i in items %}<a class="pill {{ i.css }}" href="{{ i.url }}" title="{{ i.tip }}">{{ i.label }}</a>{% endfor %}</div></td></tr>
+  {% endfor %}</tbody>
+</table></div>
+<p class="meta" style="margin:6px 0 0">{{ actions|length }} project{{ actions|length|pluralize }} with something to act on. Full detail is in the Excel download (Actions tab).</p>
+{% else %}<p class="muted">Nothing needs a decision this month.</p>{% endif %}
+{% endwith %}
 
 {% if r.kpi_failures_this_month %}
 <h2 class="sec">KPI failures recorded in {{ r.first|date:"F" }}</h2>

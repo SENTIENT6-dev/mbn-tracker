@@ -45,6 +45,40 @@ class Row:
 
 
 @dataclass
+class Issue:
+    """One thing to act on, shown as a short tag that links to where it's fixed."""
+    label: str
+    url: str
+    css: str        # pill style
+    tip: str = ""
+
+
+def issues_for(row, approaching):
+    """Short, linked issues for one project, most pressing first."""
+    p = row.project.pk
+    mpsr = f"/mpsr/{p}/"
+    out = []
+    for i in row.fin.kpi_issues:
+        out.append(Issue(f"⚑ KPI issue: {i.short}", f"{mpsr}#kpi-issues", "over", i.text))
+    for r in row.fin.pccf_reasons:
+        what = "cash flow" if r.is_cash else r.label.replace(" performance", "")
+        out.append(Issue(f"⚠ PCCF: {what}", f"{mpsr}#{'mpsr-cash' if r.is_cash else 'mpsr-dates'}", "warn", r.text))
+    for w in approaching:
+        when = "today" if w.days == 0 else f"in {w.days} day{'s' if w.days != 1 else ''}"
+        out.append(Issue(f"⏱ {w.label.replace(' performance', '')} {when}", f"{mpsr}#mpsr-dates", "blue", w.text))
+    if row.overdue:
+        out.append(Issue(f"✗ {row.overdue} overdue", f"{mpsr}#mpsr-actuals", "overdue",
+                         "Milestones whose forecast date passed with no actual date"))
+    if row.fin.budget_health == "over":
+        out.append(Issue("▲ Over budget", f"/projects/{p}/?tab=budget", "over",
+                         f"Committed + pending exceed the budget by ${-row.fin.remaining_budget:,.2f}"))
+    if row.underspent:
+        out.append(Issue("▼ Under-spent", f"/projects/{p}/#cash-flow", "warn",
+                         "Spend so far this year trails the forecast"))
+    return out
+
+
+@dataclass
 class StageChange:
     project: Project
     when: object
@@ -103,6 +137,15 @@ class MonthlyReport:
     @property
     def overdue_count(self):
         return sum(r.overdue for r in self.rows)
+
+    @property
+    def action_rows(self):
+        """[(row, [Issue])] for every project with something to act on, most issues first."""
+        near = {}
+        for w, f in self.approaching:
+            near.setdefault(f.project.pk, []).append(w)
+        out = [(r, issues_for(r, near.get(r.project.pk, []))) for r in self.rows]
+        return sorted([x for x in out if x[1]], key=lambda x: (-len(x[1]), x[0].project.io_number))
 
 
 def monthly_report(period=None):

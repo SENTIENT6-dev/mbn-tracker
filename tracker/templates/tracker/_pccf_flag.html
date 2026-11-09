@@ -26,7 +26,7 @@
 </div>
 {% endif %}
 {% if fin.kpi_issues %}
-<div class="kpi-issues" role="status">
+<div class="kpi-issues" id="kpi-issues" role="status">
   <strong>⚑ KPI issue{{ fin.kpi_issues|pluralize }}: target date{{ fin.kpi_issues|pluralize }} missed</strong>
   {% for i in fin.kpi_issues %}
   <div class="kpi-item"><span>{{ i.text }}</span>

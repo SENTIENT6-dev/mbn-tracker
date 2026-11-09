@@ -187,6 +187,7 @@ class Financials:
     pending: Decimal = ZERO
     invoiced: Decimal = ZERO
     kpi_failures: list = field(default_factory=list)
+    closing: bool = False   # closing out: stage Closeout or later, phase Financial Close, or completed / closed
 
     @property
     def pccf_reasons(self):
@@ -335,13 +336,17 @@ class Financials:
 
     @property
     def budget_health(self):
-        """ok / tight / over, based on budget left after commitments and pending COs."""
+        """ok / tight / full / over, based on budget left after commitments and pending COs.
+
+        Little or nothing left is a warning ("tight") while work is still to be bought. A project that's closing
+        out is expected to have its budget fully committed, so there it's just "full", not a warning.
+        """
         if not self.budget:
             return "none"
         if self.remaining_budget <= -1:   # more than a dollar over (cents are rounding)
             return "over"
         if self.remaining_budget < self.budget * Decimal("0.05"):
-            return "tight"
+            return "full" if self.closing else "tight"
         return "ok"
 
 
@@ -364,6 +369,7 @@ def financials(projects):
     kpis = {}
     for k in KPIFailure.objects.filter(project_id__in=ids):
         kpis.setdefault(k.project_id, []).append(k)
+    is_closing = closing_check()
 
     pos =PurchaseOrder.objects.filter(project_id__in=ids)
     commit = _sum_by(pos, "project_id", "amount")
@@ -374,7 +380,7 @@ def financials(projects):
     invoiced = _sum_by(Invoice.objects.filter(po__project_id__in=ids), "po__project_id", "amount")
 
     return [Financials(project=p, pccf=latest.get(p.id), vow=vows.get(p.id), status=statuses.get(p.id),
-                       kpi_failures=kpis.get(p.id, []),
+                       kpi_failures=kpis.get(p.id, []), closing=is_closing(p, statuses.get(p.id)),
                        commitments=commit.get(p.id, ZERO), consultant_commitments=consult.get(p.id, ZERO),
                        contractor_commitments=contract.get(p.id, ZERO), pending=pending.get(p.id, ZERO),
                        invoiced=invoiced.get(p.id, ZERO))
@@ -513,19 +519,32 @@ def tender_deadline(status):
 CONSTRUCTION_PHASES = (Project.Phase.CONSTRUCTION, Project.Phase.FINANCIAL_CLOSE)
 
 
+def _stage_reached(gate_name):
+    """Returns reached(status): the status's stage is the named gate or a later one."""
+    from .models import StageGate
+    gates = dict(StageGate.objects.values_list("pk", "order"))
+    start = StageGate.objects.filter(name__iexact=gate_name).values_list("order", flat=True).first()
+
+    def reached(status):
+        stage_order = gates.get(status.stage_id) if status is not None else None
+        return start is not None and stage_order is not None and stage_order >= start
+    return reached
+
+
 def construction_check():
     """Returns is_in_construction(project, status): the stage is Construction or a later gate, or the
     project's phase is Construction / Financial Close. Either means the project has gone past tender."""
-    from .models import StageGate
-    gates = dict(StageGate.objects.values_list("pk", "order"))
-    start = StageGate.objects.filter(name__iexact="Construction").values_list("order", flat=True).first()
+    reached = _stage_reached("Construction")
+    return lambda project, status: project.phase in CONSTRUCTION_PHASES or reached(status)
 
-    def check(project, status):
-        if project.phase in CONSTRUCTION_PHASES:
-            return True
-        stage_order = gates.get(status.stage_id) if status is not None else None
-        return start is not None and stage_order is not None and stage_order >= start
-    return check
+
+def closing_check():
+    """Returns is_closing(project, status): the stage is Closeout or later, the phase is Financial Close, or the
+    project is completed / closed. Its budget is expected to be fully committed by then."""
+    reached = _stage_reached("Closeout")
+    done = (Project.Status.COMPLETED, Project.Status.CLOSED)
+    return lambda project, status: (project.status in done or project.phase == Project.Phase.FINANCIAL_CLOSE
+                                    or reached(status))
 
 
 @dataclass

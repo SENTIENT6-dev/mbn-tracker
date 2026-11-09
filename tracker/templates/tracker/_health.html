@@ -1,5 +1,6 @@
 {% if f.budget_health == 'over' %}<span class="pill over" title="Commitments and pending changes exceed the budget">▲ Over budget</span>
 {% elif f.budget_health == 'tight' %}<span class="pill tight" title="Less than 5% of budget uncommitted">● Tight</span>
+{% elif f.budget_health == 'full' %}<span class="pill none" title="Closing out with the budget fully committed, as expected">Fully committed</span>
 {% elif f.budget_health == 'ok' %}<span class="pill ok">✓ On budget</span>
 {% else %}<span class="pill none">No budget</span>{% endif %}
 {% if f.schedule.overdue %}<span class="pill overdue" title="Forecast date passed with no actual date recorded">⏱ {{ f.schedule.overdue }} overdue</span>{% endif %}

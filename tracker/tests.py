@@ -974,6 +974,43 @@ class TenderInConstructionTests(Base):
         self.assertNotContains(r, "data-tender-confirm=")     # no tick button left to press
 
 
+class BudgetHealthTests(Base):
+    """Base project: budget 550,000 (no fee), 485,000 committed. Add POs to get under 5% left."""
+
+    def setUp(self):
+        super().setUp()
+        from .models import StageGate
+        self.constr = StageGate.objects.create(name="Construction", order=6)
+        self.close = StageGate.objects.create(name="Closeout", order=7)
+        PurchaseOrder.objects.create(number=333, project=self.p, vendor=self.build, amount=D("60000"))  # 5,000 left
+
+    def _health(self):
+        return project_financials(Project.objects.get(pk=self.p.pk)).budget_health
+
+    def test_little_left_is_tight_while_work_remains(self):
+        ProjectStatus.objects.filter(project=self.p).update(stage=self.constr)
+        self.assertEqual(self._health(), "tight")
+
+    def test_closing_out_is_fully_committed_not_tight(self):
+        ProjectStatus.objects.filter(project=self.p).update(stage=self.close)
+        self.assertEqual(self._health(), "full")
+        r = self.client.get("/projects/")
+        self.assertContains(r, "Fully committed")
+        self.assertNotContains(r, "● Tight")
+        self.assertNotIn(self.p.pk, [f.project.pk for f in self.client.get("/").context["attention"]])
+
+    def test_financial_close_phase_or_completed_count_as_closing(self):
+        Project.objects.filter(pk=self.p.pk).update(phase=Project.Phase.FINANCIAL_CLOSE)
+        self.assertEqual(self._health(), "full")
+        Project.objects.filter(pk=self.p.pk).update(phase=None, status=Project.Status.COMPLETED)
+        self.assertEqual(self._health(), "full")
+
+    def test_over_budget_still_shows_when_closing(self):
+        ProjectStatus.objects.filter(project=self.p).update(stage=self.close)
+        PurchaseOrder.objects.create(number=444, project=self.p, vendor=self.build, amount=D("10000"))
+        self.assertEqual(self._health(), "over")
+
+
 class RolloverTests(Base):
     """Base project: forecast Q1 10 + Q2 20; PCCF 0 approves Q1 1,000 + Q2 2,000."""
 

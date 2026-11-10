@@ -453,9 +453,9 @@ def invoice_form(request, pk):
 
 
 def _safe_next(request):
-    """A `next` return address, only if it's a path inside this app."""
-    nxt = request.GET.get("next", "")
-    return nxt if nxt.startswith("/") and not nxt.startswith("//") else ""
+    """A `next` return address, only if it's inside this app."""
+    from .safe import safe_next
+    return safe_next(request, "", request.GET)
 
 
 def invoice_delete(request, pk):
@@ -468,11 +468,10 @@ def invoice_delete(request, pk):
 
 def change_order_form(request, pk):
     co = get_object_or_404(ChangeOrder.objects.select_related("po"), pk=pk)
-    old_value, old_status = co.value, co.status
     form = F.ChangeOrderEditForm(request.POST or None, instance=co)
 
     def save(f):
-        po = ops.save_change_order(f.save(commit=False), old_value=old_value, old_status=old_status)
+        po = ops.save_change_order(f.save(commit=False))
         messages.success(request, f"Change order saved · PO {po.number} value is ${po.amount:,.2f}")
         return f"/pos/{po.number}/"
     return edit_page(request, form, "Edit change order", f"/pos/{co.po.number}/", save)

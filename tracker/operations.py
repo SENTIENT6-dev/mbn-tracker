@@ -7,7 +7,7 @@ confirmation page.
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import F, Sum
 from django.utils import timezone
 
 from .models import BuildingRole, ChangeOrder, Invoice, Person, Project, PurchaseOrder
@@ -61,29 +61,40 @@ def delete_po(po):
 
 # ---------------------------------------------------------------- change orders
 
+def _add_to_po(po_id, amount):
+    """Change a PO's value in the database itself, so two saves at once can't overwrite each other."""
+    if amount:
+        PurchaseOrder.objects.filter(pk=po_id).update(amount=F("amount") + amount)
+
+
 @transaction.atomic
-def save_change_order(co, old_value=None, old_status=None):
-    """Save a change order; if it was already processed into its PO, keep the PO value in step."""
-    po = PurchaseOrder.objects.select_for_update().get(pk=co.po_id)
-    was = old_value if old_status == ChangeOrder.State.PROCESSED else ZERO
-    now = co.value if co.status == ChangeOrder.State.PROCESSED else ZERO
-    if was != now:
-        po.amount += now - was
-        po.save()
-        if co.status == ChangeOrder.State.PROCESSED and not co.processed_on:
+def save_change_order(co):
+    """Save a change order; when it is (or was) processed into its PO, keep the PO value in step.
+
+    What was already added to a PO comes from the change order as saved in the database, read inside this
+    transaction, never from the copy the caller holds: a page left open, or two clicks at once, can't add it twice.
+    """
+    P = ChangeOrder.State.PROCESSED
+    stored = ChangeOrder.objects.select_for_update().filter(pk=co.pk).first() if co.pk else None
+    if stored and stored.status == P:
+        _add_to_po(stored.po_id, -stored.value)          # take out what's in the PO now...
+    if co.status == P:
+        _add_to_po(co.po_id, co.value)                   # ...and put in what it should be
+        if not co.processed_on:
             co.processed_on = timezone.now()
     co.save()
-    return po
+    return PurchaseOrder.objects.get(pk=co.po_id)
 
 
 @transaction.atomic
 def delete_change_order(co, reverse=True):
     """Deleting a processed change order takes its value back out of the PO (unless told not to)."""
-    if co.status == ChangeOrder.State.PROCESSED and reverse:
-        po = PurchaseOrder.objects.select_for_update().get(pk=co.po_id)
-        po.amount -= co.value
-        po.save()
-    co.delete()
+    stored = ChangeOrder.objects.select_for_update().filter(pk=co.pk).first()
+    if stored is None:
+        return                                           # already deleted
+    if stored.status == ChangeOrder.State.PROCESSED and reverse:
+        _add_to_po(stored.po_id, -stored.value)
+    stored.delete()
 
 
 # ---------------------------------------------------------------- companies / vendors

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from io import BytesIO
 
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import KPIFailure, MPSRReview, Owner, Project, StatusHistory
@@ -99,6 +100,19 @@ class MonthlyReport:
     approaching: list
     generated: object = field(default_factory=timezone.now)
 
+    @property
+    def is_past(self):
+        """A month that has ended. Money figures and flags are worked out from today's data, not the month's."""
+        return self.last < timezone.localdate(self.generated)
+
+    @property
+    def figures_note(self):
+        if not self.is_past:
+            return ""
+        return (f"Budget, PO, invoice and flag figures are as of {timezone.localdate(self.generated):%Y-%m-%d}, "
+                f"not as they stood at the end of {self.first:%B %Y}. What was reported each month is kept "
+                f"on each project's MPSR page (Changed since).")
+
     def _sum(self, attr):
         return sum((getattr(r.fin, attr) for r in self.rows), ZERO)
 
@@ -152,8 +166,10 @@ class MonthlyReport:
 def monthly_report(period=None):
     today = timezone.localdate()
     first, last = month_bounds(period or today)
-    projects = list(Project.objects.filter(status__in=REPORTING).select_related("current_status__stage")
-                    .order_by("io_number"))
+    # projects active or on hold today, plus any reported that month that have closed since
+    reported = MPSRReview.objects.filter(period=first).values("project_id")
+    projects = list(Project.objects.filter(Q(status__in=REPORTING) | Q(pk__in=reported))
+                    .select_related("current_status__stage").order_by("io_number"))
     fins = financials(projects)
     done = set(MPSRReview.objects.filter(period=first, project__in=projects).values_list("project_id", flat=True))
 
@@ -237,9 +253,12 @@ def report_workbook(report):
     ws.append([f"Monthly report · {report.first:%B %Y}"])
     ws["A1"].font = Font(bold=True, size=14)
     ws.append([f"{who} · generated {timezone.localtime(report.generated):%Y-%m-%d %H:%M}"])
+    if report.is_past:
+        ws.append([report.figures_note])
+        ws.cell(ws.max_row, 1).font = Font(bold=True, color="9A5B00")
     ws.append([])
     for label, value, is_money in [
-        ("Active and on-hold projects", len(report.rows), False),
+        ("Projects", len(report.rows), False),
         ("Total budget incl. fee", t["budget_with_fee"], True), ("Budget (no fee)", t["budget"], True),
         ("Committed", t["commitments"], True), ("Pending change orders", t["pending"], True),
         ("Invoiced", t["invoiced"], True), ("Uncommitted", t["remaining_budget"], True),
@@ -292,6 +311,14 @@ def report_workbook(report):
     sheet(wb.create_sheet("Stage changes"), ["IO #", "Title", "Date", "From", "To"],
           [[c.project.io_number, c.project.title, c.when, c.before, c.after] for c in report.stage_changes],
           [11, 38, 12, 16, 16])
+
+    # Text that starts with "=" (a project title, a comment...) would be saved as a formula, which Excel
+    # would run. The report has no formulas of its own, so every cell is written as a plain value.
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.data_type == "f":
+                    cell.data_type = "s"
 
     out = BytesIO()
     wb.save(out)

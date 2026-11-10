@@ -1769,3 +1769,105 @@ class StopTrackerTests(Base):
             self.assertNotContains(self.client.get("/"), 'action="/stop/"')
             self.assertEqual(self.client.post("/stop/").status_code, 403)
             exit_soon.assert_not_called()
+
+
+class HostedSecurityTests(TestCase):
+    """Fixes from the security review: password changes sign everyone out; no redirects to other sites."""
+
+    def test_changing_the_password_signs_everyone_out(self):
+        from django.test import override_settings
+        with override_settings(SITE_PASSWORD="first"):
+            self.client.post("/login/", {"password": "first", "next": "/"})
+            self.assertRedirects(self.client.get("/projects/"), "/setup/", fetch_redirect_response=False)
+        with override_settings(SITE_PASSWORD="second"):
+            self.assertRedirects(self.client.get("/projects/"), "/login/?next=/projects/",
+                                 fetch_redirect_response=False)
+
+    def test_server_copy_needs_a_password(self):
+        import os
+        import subprocess
+        import sys
+        env = {**os.environ, "MBN_DEBUG": "0", "MBN_SECRET_KEY": "x" * 50, "MBN_PASSWORD": ""}
+        r = subprocess.run([sys.executable, "manage.py", "check"], env=env, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("Set MBN_PASSWORD", r.stderr)
+
+
+class RedirectSafetyTests(Base):
+    def test_change_order_action_stays_on_site(self):
+        co = ChangeOrder.objects.create(po=self.po1, description="Extra", value=D("10"))
+        for bad in ("https://evil.example/", "//evil.example/", r"/\evil.example/"):
+            r = self.client.post(f"/change-orders/{co.pk}/reject/", {"next": bad})
+            self.assertEqual(r.status_code, 302)
+            self.assertTrue(r["Location"].startswith("/"), bad)
+            self.assertNotIn("evil", r["Location"], bad)
+        r = self.client.post(f"/change-orders/{co.pk}/reject/", {"next": "/change-orders/"})
+        self.assertEqual(r["Location"], "/change-orders/")
+
+
+class FinancialIntegrityTests(Base):
+    """Fixes from the security review: a change order can only be added to its PO once."""
+
+    def test_stale_copies_cannot_process_twice(self):
+        from .operations import save_change_order
+        co = ChangeOrder.objects.create(po=self.po1, description="Extra", value=D("10"),
+                                        status=ChangeOrder.State.APPROVED)
+        a, b = ChangeOrder.objects.get(pk=co.pk), ChangeOrder.objects.get(pk=co.pk)   # two pages open at once
+        for copy in (a, b):
+            copy.status = ChangeOrder.State.PROCESSED
+            save_change_order(copy)
+        self.po1.refresh_from_db()
+        self.assertEqual(self.po1.amount, D("105010"))                  # added once, not twice
+
+    def test_process_button_twice(self):
+        co = ChangeOrder.objects.create(po=self.po1, description="Extra", value=D("10"),
+                                        status=ChangeOrder.State.APPROVED)
+        self.client.post(f"/change-orders/{co.pk}/process/")
+        self.client.post(f"/change-orders/{co.pk}/process/")
+        self.po1.refresh_from_db()
+        self.assertEqual(self.po1.amount, D("105010"))
+
+    def test_editing_a_processed_change_order_adjusts_by_the_difference(self):
+        from .operations import delete_change_order, save_change_order
+        co = ChangeOrder.objects.create(po=self.po1, description="Extra", value=D("10"),
+                                        status=ChangeOrder.State.APPROVED)
+        co.status = ChangeOrder.State.PROCESSED
+        save_change_order(co)
+        stale = ChangeOrder.objects.get(pk=co.pk)
+        co.value = D("25")
+        save_change_order(co)
+        self.po1.refresh_from_db()
+        self.assertEqual(self.po1.amount, D("105025"))
+        delete_change_order(stale)                                      # an older copy still takes out 25
+        self.po1.refresh_from_db()
+        self.assertEqual(self.po1.amount, D("105000"))
+
+    def test_requests_are_serialized(self):
+        from django.conf import settings
+        db = settings.DATABASES["default"]
+        self.assertTrue(db["ATOMIC_REQUESTS"])
+        self.assertEqual(db["OPTIONS"]["transaction_mode"], "IMMEDIATE")
+
+
+class ReportSafetyTests(Base):
+    def test_excel_writes_user_text_as_text(self):
+        from io import BytesIO
+
+        from openpyxl import load_workbook
+        self.p.title = "=1+1"
+        self.p.save()
+        r = self.client.get("/reports/monthly.xlsx?period=2026-11")
+        ws = load_workbook(BytesIO(r.content))["Projects"]
+        cells = [c for row in ws.iter_rows() for c in row if c.value == "=1+1"]
+        self.assertTrue(cells)
+        self.assertTrue(all(c.data_type == "s" for c in cells))
+
+    def test_past_month_is_labelled_and_keeps_closed_projects(self):
+        from .models import MPSRReview
+        MPSRReview.objects.create(project=self.p, period=dt.date(2025, 1, 1))
+        self.p.status = Project.Status.COMPLETED
+        self.p.save()
+        r = self.client.get("/reports/monthly/?period=2025-01")
+        self.assertContains(r, "not as they stood at the end of January 2025")
+        self.assertIn(self.p, [row.project for row in r.context["r"].rows])   # reported then, closed since
+        self.assertNotContains(self.client.get("/reports/monthly/"), "not as they stood")

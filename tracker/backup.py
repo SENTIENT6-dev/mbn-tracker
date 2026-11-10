@@ -39,6 +39,9 @@ def backup_database(label="manual"):
     """Copy the database into the backups folder. Returns the file path (None if it isn't a SQLite file)."""
     if not _is_backupable():
         return None
+    if connection.in_atomic_block:
+        # copying waits for the transaction to finish, which would never happen: refuse instead of hanging
+        raise RuntimeError("A backup can't be made inside a transaction (see @transaction.non_atomic_requests).")
     target = folder() / f"db-{label}-{timezone.localtime():%Y%m%d-%H%M%S}.sqlite3"
     connection.ensure_connection()
     dest = sqlite3.connect(str(target))

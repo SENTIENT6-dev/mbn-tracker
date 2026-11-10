@@ -17,3 +17,6 @@ staticfiles/
 
 # Server messages when started from start.bat / the desktop shortcut
 tracker.log
+
+# Zips of this folder can contain the database: never commit them
+*.zip

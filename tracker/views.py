@@ -26,6 +26,7 @@ from .models import (
     ValueOfWork,
 )
 from .operations import save_change_order
+from .safe import safe_next
 from .services import (
     approved_cash_for_year,
     approved_for_year,
@@ -381,9 +382,7 @@ def tender_tick(request, pk):
     """Tick (or untick) the 'Go to tender' milestone. Ticking records today's date; edit it under actual dates."""
     project = get_object_or_404(Project, pk=pk)
     status, _ = ProjectStatus.objects.get_or_create(project=project)
-    nxt = request.POST.get("next", "")
-    if not nxt.startswith("/") or nxt.startswith("//"):
-        nxt = f"/projects/{pk}/?tab=mpsr"
+    nxt = safe_next(request, f"/projects/{pk}/?tab=mpsr", request.POST)
     if request.POST.get("action") == "undo":
         if status.actual_tender:
             with transaction.atomic():
@@ -419,8 +418,7 @@ def tender_tick(request, pk):
 
 
 def _next(request, pk):
-    nxt = request.POST.get("next", "")
-    return nxt if nxt.startswith("/") and not nxt.startswith("//") else f"/projects/{pk}/"
+    return safe_next(request, f"/projects/{pk}/", request.POST)
 
 
 @require_POST
@@ -587,12 +585,14 @@ def po_detail(request, number):
 
 @require_POST
 def change_order_action(request, co_id, action):
-    co = get_object_or_404(ChangeOrder.objects.select_related("po"), pk=co_id)
     S = ChangeOrder.State
     with transaction.atomic():
+        # read inside the transaction (which holds the database's write lock), so the status check below sees
+        # any change another request just made: processing twice can't add the value to the PO twice
+        co = get_object_or_404(ChangeOrder.objects.select_for_update().select_related("po"), pk=co_id)
         if action == "process" and co.status == S.APPROVED:
             co.status = S.PROCESSED
-            po = save_change_order(co, old_value=co.value, old_status=S.APPROVED)
+            po = save_change_order(co)
             messages.success(request, f"PO {po.number} revised to ${po.amount:,.2f}")
         elif action == "approve" and co.status == S.REQUESTED:
             err = co_budget_error(co.po, ZERO, co.value)          # approving makes it count against the budget
@@ -604,8 +604,7 @@ def change_order_action(request, co_id, action):
         elif action == "reject" and co.status in (S.REQUESTED, S.APPROVED):
             co.status = S.REJECTED
             co.save()
-    nxt = request.POST.get("next")
-    return redirect(nxt) if nxt else redirect("po", number=co.po.number)
+    return redirect(safe_next(request, f"/pos/{co.po.number}/", request.POST))
 
 
 def po_form(request, number=None):

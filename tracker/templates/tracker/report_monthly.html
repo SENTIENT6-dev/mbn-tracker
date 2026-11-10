@@ -28,12 +28,14 @@
 <div class="report">
 <div class="page-head">
   <div><h1>Monthly report · {{ r.first|date:"F Y" }}</h1>
-    <div class="sub">{% if r.owner %}{{ r.owner.person }} · {% endif %}{{ r.rows|length }} active and on-hold project{{ r.rows|length|pluralize }} · generated {{ r.generated|date:"Y-m-d H:i" }}</div></div>
+    <div class="sub">{% if r.owner %}{{ r.owner.person }} · {% endif %}{{ r.rows|length }} project{{ r.rows|length|pluralize }} · generated {{ r.generated|date:"Y-m-d H:i" }}</div></div>
   <span class="spacer"></span>
   <div class="seg no-print"><a href="?period={{ prev }}">‹ Previous month</a><a href="?period={{ next }}">Next ›</a></div>
   <a class="btn no-print" href="/reports/monthly.xlsx{{ q }}">Download Excel</a>
   <button class="btn primary no-print" type="button" onclick="window.print()">Print / Save as PDF</button>
 </div>
+
+{% if r.is_past %}<div class="msg warning" role="note"><span>{{ r.figures_note }}</span></div>{% endif %}
 
 <div class="tiles">
   <div class="tile"><div class="k">Total budget incl. fee</div><div class="v">{{ r.totals.budget_with_fee|money }}</div>

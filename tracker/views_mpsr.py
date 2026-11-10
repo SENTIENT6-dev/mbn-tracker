@@ -14,6 +14,7 @@ from django.utils import timezone
 from . import forms as F
 from . import snapshot
 from .models import MPSRReview, MPSRSnapshot, Project, ProjectStatus, StatusHistory, ValueOfWork
+from .safe import safe_next
 from .services import (
     PCCF_DATES,
     TENDER_DAYS,
@@ -156,6 +157,7 @@ def _save(project, status, fin, forms, period):
     return changed
 
 
+@transaction.non_atomic_requests   # makes a backup first, which can't run inside a transaction
 def rollover(request):
     """Preview, then move forecasts set to an earlier fiscal year forward to the current one."""
     from . import rollover as R
@@ -176,8 +178,7 @@ def rollover(request):
         messages.success(request, f"{len(picked)} forecast{'s' if len(picked) != 1 else ''} moved to "
                                   f"FY {fiscal_label(to_year)}." +
                                   (f" A backup was saved first: backups\\{backup.name}" if backup else ""))
-        nxt = request.POST.get("next", "")
-        return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else "/mpsr/")
+        return redirect(safe_next(request, "/mpsr/", request.POST))
     return render(request, "tracker/rollover.html", {
         "plans": plans, "to_label": fiscal_label(to_year), "only": only,
         "next": request.GET.get("next", "")})

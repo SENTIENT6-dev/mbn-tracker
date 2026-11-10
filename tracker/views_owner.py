@@ -4,6 +4,7 @@ import threading
 
 from django.conf import settings
 from django.contrib import messages
+from django.db import transaction
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
@@ -49,6 +50,7 @@ def stop_tracker(request):
     return render(request, "tracker/stopped.html")
 
 
+@transaction.non_atomic_requests   # Back up now can't run inside a transaction
 def settings_page(request):
     owner = Owner.current()
     profile = F.OwnerForm(request.POST if "save_profile" in request.POST else None,

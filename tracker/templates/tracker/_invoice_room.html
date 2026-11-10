@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function(){
   const saves = form.querySelectorAll('.js-save');
   const msg = form.querySelector('.room-msg');
   const $ = n => (n < 0 ? '−$' : '$') + Math.abs(n).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  // project and PO numbers are typed by users: escape them before they go into the HTML below
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[c]));
   const poId = () => box.dataset.fixedPo || (sel ? sel.value : '');
 
   function update(){
@@ -20,11 +22,11 @@ document.addEventListener('DOMContentLoaded', function(){
       setBlocked(false, ''); return;
     }
     const projLine = r.has_budget
-      ? `<div class="room-row ${r.limit === 'project' ? 'lim' : ''}"><span>Project ${r.project} budget left after fees</span><strong>${$(r.proj_left)}</strong>
+      ? `<div class="room-row ${r.limit === 'project' ? 'lim' : ''}"><span>Project ${esc(r.project)} budget left after fees</span><strong>${$(r.proj_left)}</strong>
            <small>${$(r.budget)} budget (excl. fee) − ${$(r.proj_invoiced)} invoiced</small></div>`
-      : `<div class="room-row"><span>Project ${r.project}</span><strong>—</strong><small>No PCCF budget on file, so only the PO limit applies</small></div>`;
+      : `<div class="room-row"><span>Project ${esc(r.project)}</span><strong>—</strong><small>No PCCF budget on file, so only the PO limit applies</small></div>`;
     box.innerHTML =
-      `<div class="room-row ${r.limit === 'po' ? 'lim' : ''}"><span>PO ${r.po} remaining</span><strong>${$(r.po_left)}</strong>
+      `<div class="room-row ${r.limit === 'po' ? 'lim' : ''}"><span>PO ${esc(r.po)} remaining</span><strong>${$(r.po_left)}</strong>
          <small>${$(r.po_value)} PO value${r.po_pending ? ' + ' + $(r.po_pending) + ' approved changes' : ''} − ${$(r.po_invoiced)} invoiced</small></div>`
       + projLine
       + `<div class="room-row total"><span>Available for this invoice</span><strong class="${r.available <= 0 ? 'neg' : ''}">${$(r.available)}</strong></div>`;

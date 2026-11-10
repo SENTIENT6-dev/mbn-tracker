@@ -37,14 +37,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const sel = document.querySelector('[name="project"]'), amt = document.querySelector('[name="amount"]');
   const save = document.getElementById('po-save');
   const $ = n => (n < 0 ? '−$' : '$') + Math.abs(n).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  // project numbers are typed by users: escape them before they go into the HTML below
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[c]));
   const block = text => { save.disabled = !!text; save.title = text ? 'Not enough budget' : '';
                           msg.textContent = text; msg.style.display = text ? 'block' : 'none'; };
   function update() {
     const r = rooms[sel && sel.value];
     if (!r) { box.innerHTML = '<div class="muted">Pick a project to see the maximum PO value its budget allows.</div>'; block(''); return; }
-    if (!r.has_budget) { box.innerHTML = `<div class="room-row"><span>Project ${r.project}</span><strong>—</strong><small>No PCCF budget on file, so no limit can be checked</small></div>`; block(''); return; }
+    if (!r.has_budget) { box.innerHTML = `<div class="room-row"><span>Project ${esc(r.project)}</span><strong>—</strong><small>No PCCF budget on file, so no limit can be checked</small></div>`; block(''); return; }
     box.innerHTML =
-      `<div class="room-row"><span>Budget excluding fee (PCCF ${r.pccf})</span><strong>${$(r.budget)}</strong><small>fee of ${$(r.fee)} not available for POs</small></div>`
+      `<div class="room-row"><span>Budget excluding fee (PCCF ${esc(r.pccf)})</span><strong>${$(r.budget)}</strong><small>fee of ${$(r.fee)} not available for POs</small></div>`
       + `<div class="room-row"><span>Already on POs</span><strong>− ${$(r.committed)}</strong><small>${old && old.project == sel.value ? 'not counting this PO' : 'all POs on the project'}</small></div>`
       + (r.pending ? `<div class="room-row"><span>Approved change orders not yet in their PO</span><strong>− ${$(r.pending)}</strong></div>` : '')
       + `<div class="room-row total"><span>Maximum PO value</span><strong class="${r.available <= 0 ? 'neg' : ''}">${$(r.available)}</strong></div>`;

@@ -7,6 +7,7 @@ import time
 
 from django.conf import settings
 from django.shortcuts import redirect, render
+from django.utils.crypto import salted_hmac
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from .models import Owner
@@ -22,10 +23,16 @@ class SitePasswordMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if (settings.SITE_PASSWORD and not request.session.get(SESSION_KEY)
+        if (settings.SITE_PASSWORD and not hmac.compare_digest(str(request.session.get(SESSION_KEY) or ""),
+                                                               password_mark())
                 and not request.path.startswith(("/login/", "/static/", "/favicon.ico"))):
             return redirect(f"/login/?next={request.get_full_path()}")
         return self.get_response(request)
+
+
+def password_mark():
+    """Stored in the session at sign-in. It changes when the password changes, which signs everyone out."""
+    return salted_hmac("tracker.site-password", settings.SITE_PASSWORD).hexdigest()
 
 
 def login_view(request):
@@ -38,7 +45,7 @@ def login_view(request):
     if request.method == "POST":
         if hmac.compare_digest(request.POST.get("password", "").encode(), settings.SITE_PASSWORD.encode()):
             request.session.cycle_key()
-            request.session[SESSION_KEY] = True
+            request.session[SESSION_KEY] = password_mark()
             request.session.set_expiry(60 * 60 * 24 * 14)     # stay signed in for two weeks
             return redirect(nxt)
         time.sleep(1)                                         # slows down guessing

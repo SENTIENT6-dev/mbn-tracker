@@ -29,7 +29,7 @@ The free plan's disk is temporary: the demo data is reloaded whenever the servic
 Settings for any server (environment variables):
 | Variable | Purpose |
 |---|---|
-| `MBN_PASSWORD` | Password to open the site. Blank = no password (fine on your own PC) |
+| `MBN_PASSWORD` | Password to open the site. Required on a server (`MBN_DEBUG=0`): it won't start without one. Changing it signs everyone out. Blank on your own PC = no password |
 | `MBN_DEBUG` | `0` on a server |
 | `MBN_SECRET_KEY` | Long random string, required when `MBN_DEBUG=0` |
 | `MBN_HOSTS` | The site's host name(s), comma-separated |
@@ -40,7 +40,9 @@ Settings for any server (environment variables):
 | `MBN_ALLOW_STOP` | `0` hides *Stop tracker* (it's already off when `MBN_DEBUG=0`) |
 
 ## Giving a copy to another PM
-1. Copy this folder **without** `db.sqlite3`, `db.backup-*.sqlite3` and `.venv`.
+1. Run `.venv\Scripts\python.exe make_share_zip.py`. It makes `IO-PM-Tracker.zip` next to this folder with the
+   program only: no database, backups, log or Python environment. **Don't zip the folder yourself**: it holds
+   your data.
 2. On their PC (Python 3.11 installed): double-click `install.bat` once. It also puts an **IO PM Tracker**
    shortcut on their desktop.
 3. Double-click the shortcut (or `start.bat`). The tracker asks for their name and details, then opens empty, ready for their

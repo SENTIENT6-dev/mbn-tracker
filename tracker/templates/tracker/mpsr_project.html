@@ -201,7 +201,7 @@
   </form>
 </div>
 <script>
-// Cash-flow totals follow the boxes as you type, before saving.
+// Cash-flow totals update when you leave a box, before saving.
 document.addEventListener('DOMContentLoaded', () => {
   const box = n => document.querySelector(`[name="cash-${n}"]`);
   const fyBox = box('fiscal_year');
@@ -243,10 +243,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (fyCell) fyCell.classList.toggle('differs', off);
     }
   };
-  [...all, fyBox].forEach(el => el && ['input', 'change'].forEach(ev => el.addEventListener(ev, update)));
+  // update when you leave a box ("change"), not on every keystroke
+  [...all, fyBox].forEach(el => el && el.addEventListener('change', update));
   update();
 
-  // Forecast dates: target status as you type. A target date is pass/fail, so no day counts:
+  // Forecast dates: target status, updated when you leave a box. A target date is pass/fail, so no day counts:
   //   met / missed (KPI failure) once it has passed; before that, a different forecast needs a PCCF in time.
   document.querySelectorAll('.date-check').forEach(p => {
     const input = p.querySelector('input'), note = p.querySelector('.date-note');
@@ -273,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!forecast || forecast === approved) return say('✓ On track for the target', 'ok');
       say(`⚠ Differs from the target: submit a PCCF before ${approved} to change it`, 'warn');
     };
-    [input, actualBox, ...clearBoxes].forEach(el => el && ['input', 'change'].forEach(ev => el.addEventListener(ev, check)));
+    [input, actualBox, ...clearBoxes].forEach(el => el && el.addEventListener('change', check));
     check();
   });
 });

@@ -174,8 +174,8 @@ def rollover(request):
             messages.error(request, "Nothing rolled forward: no projects were ticked.")
             return redirect(request.get_full_path())
         backup = R.backup_database("rollover")
-        R.apply(picked)
-        messages.success(request, f"{len(picked)} forecast{'s' if len(picked) != 1 else ''} moved to "
+        moved = R.apply(picked)
+        messages.success(request, f"{moved} forecast{'s' if moved != 1 else ''} moved to "
                                   f"FY {fiscal_label(to_year)}." +
                                   (f" A backup was saved first: backups\\{backup.name}" if backup else ""))
         return redirect(safe_next(request, "/mpsr/", request.POST))

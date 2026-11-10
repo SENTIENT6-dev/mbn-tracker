@@ -100,13 +100,21 @@ def backup_database(label="rollover"):
 
 
 def apply(plans):
-    """Write the rolled-forward forecasts and log each one in the project's history."""
+    """Write the rolled-forward forecasts and log each one in the project's history. Returns how many moved.
+
+    Each forecast is worked out again from the saved record, locked, so an edit made after the preview is
+    rolled forward rather than overwritten.
+    """
     now = timezone.now()
+    done = 0
     with transaction.atomic():
-        for p in plans:
-            st = ProjectStatus.objects.select_for_update().get(pk=p.status.pk)
-            if st.fiscal_year != p.from_year:      # changed since the preview: leave it alone
+        for preview in plans:
+            st = ProjectStatus.objects.select_for_update().select_related("project").get(pk=preview.status.pk)
+            fresh = plan([st], preview.to_year)
+            if not fresh:                          # already moved forward since the preview
                 continue
+            p = fresh[0]
+            done += 1
             for k, v in p.after.items():
                 setattr(st, k, v)
             st.fiscal_year = p.to_year
@@ -116,3 +124,4 @@ def apply(plans):
                 text=f"Fiscal-year rollover: forecast moved from FY {p.from_label} to FY {p.to_label}",
                 data={"fiscal_year": p.to_year, **{k: float(v) for k, v in p.after.items()},
                       "rolled_from": {"fiscal_year": p.from_year, **{k: float(v) for k, v in p.before.items()}}})
+    return done

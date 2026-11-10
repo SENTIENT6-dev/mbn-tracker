@@ -1456,6 +1456,24 @@ class RolloverTests(Base):
             "vow-current_year_no_fees": "100"})
         self.assertEqual(ValueOfWork.objects.get(project=self.p).current_year_funding, D("4000"))
 
+    def test_edit_after_preview_is_rolled_not_overwritten(self):
+        """Audit: rollover previews Q1 at 10, someone changes Q1 to 200, then the rollover is saved."""
+        from .rollover import apply, plan
+        preview = plan([ProjectStatus.objects.get(project=self.p)])
+        ProjectStatus.objects.filter(project=self.p).update(q1=D("200"))
+        self.assertEqual(apply(preview), 1)
+        st = ProjectStatus.objects.get(project=self.p)
+        self.assertEqual((st.fiscal_year, st.previous), (self.fy, D("320")))    # 100 + 200 + 20, not 100 + 10 + 20
+        h = StatusHistory.objects.filter(project=self.p, text__startswith="Fiscal-year rollover").latest("pk")
+        self.assertEqual(h.data["rolled_from"]["q1"], 200.0)
+
+    def test_already_rolled_since_preview_is_skipped(self):
+        from .rollover import apply, plan
+        preview = plan([ProjectStatus.objects.get(project=self.p)])
+        ProjectStatus.objects.filter(project=self.p).update(fiscal_year=self.fy, q1=D("7"))
+        self.assertEqual(apply(preview), 0)
+        self.assertEqual(ProjectStatus.objects.get(project=self.p).q1, D("7"))
+
     def test_nothing_ticked(self):
         r = self.client.post("/mpsr/rollover/", {}, follow=True)
         self.assertContains(r, "no projects were ticked")

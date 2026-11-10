@@ -1278,10 +1278,13 @@ class BackupTests(TransactionTestCase):
     def test_daily_backup_once_a_day_and_readable(self):
         import sqlite3
 
+        from django.utils import timezone
+
         from .backup import ensure_daily_backup
-        path = ensure_daily_backup(dt.date(2026, 11, 9))
+        today = timezone.localdate()        # the file is named with the real date
+        path = ensure_daily_backup(today)
         self.assertIsNotNone(path)
-        self.assertIsNone(ensure_daily_backup(dt.date(2026, 11, 9)))   # already done today
+        self.assertIsNone(ensure_daily_backup(today))   # already done today
         self.assertEqual(len(self._files()), 1)
         con = sqlite3.connect(str(path))                                # a real copy of the data
         try:
@@ -1738,3 +1741,31 @@ class PCCFRequiredTests(Base):
         self.assertEqual(form.initial["fiscal_year"], 2027)
         self.assertEqual(form.initial["design_cost"], D("100000"))     # budget still from the last PCCF
         self.assertContains(r, "start from the current MPSR forecast")
+
+
+class StopTrackerTests(Base):
+    """Stop tracker (sidebar) shuts the tracker down on your own PC; hidden and refused on servers."""
+
+    def test_button_and_stop(self):
+        from unittest import mock
+        self.assertContains(self.client.get("/"), 'action="/stop/"')
+        with mock.patch("tracker.views_owner._exit_soon") as exit_soon:
+            self.assertEqual(self.client.get("/stop/").status_code, 405)     # only a button press stops it
+            exit_soon.assert_not_called()
+            r = self.client.post("/stop/")
+            self.assertContains(r, "The tracker has stopped")
+            exit_soon.assert_called_once()
+
+    def test_not_from_another_pc(self):
+        from unittest import mock
+        with mock.patch("tracker.views_owner._exit_soon") as exit_soon:
+            r = self.client.post("/stop/", REMOTE_ADDR="10.0.0.5")
+            self.assertEqual(r.status_code, 403)
+            exit_soon.assert_not_called()
+
+    def test_off_on_servers(self):
+        from unittest import mock
+        with self.settings(ALLOW_STOP=False), mock.patch("tracker.views_owner._exit_soon") as exit_soon:
+            self.assertNotContains(self.client.get("/"), 'action="/stop/"')
+            self.assertEqual(self.client.post("/stop/").status_code, 403)
+            exit_soon.assert_not_called()

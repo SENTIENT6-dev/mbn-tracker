@@ -14,3 +14,6 @@ __pycache__/
 staticfiles/
 .claude/
 .env
+
+# Server messages when started from start.bat / the desktop shortcut
+tracker.log

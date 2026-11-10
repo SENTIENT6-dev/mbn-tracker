@@ -177,6 +177,11 @@ aside .me{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10
 aside .me:hover{background:rgba(255,255,255,.12);text-decoration:none}
 aside .me .av{width:30px;height:30px;border-radius:50%;background:#2a78d6;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
 aside .me small{display:block;color:var(--nav-ink);font-size:11.5px;font-weight:400}
+aside .stop-form{margin:2px 0 0}
+aside .stop-btn{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;border-radius:8px;background:none;
+  color:var(--nav-ink);font:inherit;font-size:12.5px;cursor:pointer;text-align:left}
+aside .stop-btn svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round}
+aside .stop-btn:hover{background:rgba(255,255,255,.07);color:#fff}
 /* ---------- project details: 12-column grid, boxes sized to their content */
 .proj-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px 14px;align-items:start}
 .proj-grid p{margin:0 0 6px}
@@ -414,6 +419,9 @@ details>summary::-webkit-details-marker{display:none}
   <span class="sep"></span>
   {% if me %}<a href="/settings/" class="me" title="Settings"><span class="av">{{ me.first_name|first }}{{ me.last_name|first }}</span>
     <span>{{ me }}<small>{{ me.position|default:"Project Manager" }} · Settings</small></span></a>{% endif %}
+  {% if can_stop %}<form method="post" action="/stop/" class="stop-form">{% csrf_token %}
+    <button class="stop-btn" data-dialog-title="Stop the tracker?" data-dialog-text="Everything you saved is kept. To open it again, use the IO PM Tracker shortcut or start.bat." data-dialog-ok="Stop tracker">
+      <svg viewBox="0 0 24 24"><path d="M12 3v8M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>Stop tracker</button></form>{% endif %}
   {% if site_password %}<a href="/logout/" style="font-size:12.5px;opacity:.75;padding-top:2px;padding-bottom:2px">Sign out</a>{% endif %}
   {% endwith %}
 </aside>

@@ -76,6 +76,7 @@ urlpatterns = [
     # this PM's tracker
     path("setup/", o.setup, name="setup"),
     path("settings/", o.settings_page, name="settings"),
+    path("stop/", o.stop_tracker, name="stop"),
 
     # site password (hosted copies)
     path("login/", site.login_view, name="login"),

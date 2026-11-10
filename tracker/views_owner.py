@@ -1,7 +1,12 @@
-"""First-run setup and Settings: each project manager has their own tracker."""
+"""First-run setup, Settings and Stop tracker: each project manager has their own tracker."""
+import os
+import threading
+
 from django.conf import settings
 from django.contrib import messages
+from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
 
 from . import forms as F
 from .models import Owner, Project
@@ -28,6 +33,20 @@ def setup(request):
                                   f"Add your first project from Projects → ⋯ → New project.")
         return redirect("overview")
     return render(request, "tracker/setup.html", {"profile": profile})
+
+
+def _exit_soon():
+    # after the "stopped" page has been sent
+    threading.Timer(0.5, os._exit, (0,)).start()
+
+
+@require_POST
+def stop_tracker(request):
+    """Shuts the tracker down (Stop tracker in the sidebar). Only on your own PC, only from this PC."""
+    if not settings.ALLOW_STOP or request.META.get("REMOTE_ADDR") not in ("127.0.0.1", "::1"):
+        return HttpResponseForbidden("Stopping the tracker isn't allowed here.")
+    _exit_soon()
+    return render(request, "tracker/stopped.html")
 
 
 def settings_page(request):

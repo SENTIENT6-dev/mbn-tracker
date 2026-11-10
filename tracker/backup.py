@@ -39,7 +39,7 @@ def backup_database(label="manual"):
     """Copy the database into the backups folder. Returns the file path (None if it isn't a SQLite file)."""
     if not _is_backupable():
         return None
-    target = folder() / f"db-{label}-{dt.datetime.now():%Y%m%d-%H%M%S}.sqlite3"
+    target = folder() / f"db-{label}-{timezone.localtime():%Y%m%d-%H%M%S}.sqlite3"
     connection.ensure_connection()
     dest = sqlite3.connect(str(target))
     try:

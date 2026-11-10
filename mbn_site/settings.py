@@ -156,6 +156,9 @@ BACKUP_DIR = os.environ.get('MBN_BACKUP_DIR', str(BASE_DIR / 'backups'))
 BACKUP_KEEP_DAYS = int(os.environ.get('MBN_BACKUP_KEEP_DAYS', '30'))
 BACKUP_DAILY = os.environ.get('MBN_BACKUP_DAILY', '1') == '1'
 
+# "Stop tracker" in the sidebar shuts the tracker down (on your own PC). Off on servers.
+ALLOW_STOP = os.environ.get('MBN_ALLOW_STOP', '1' if DEBUG else '0') == '1'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 

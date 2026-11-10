@@ -65,4 +65,4 @@ def owner_context(request):
     """Makes `me` (the PM this tracker belongs to) available on every page."""
     owner = Owner.current()
     return {"me": owner.person if owner else None, "owner": owner,
-            "site_password": bool(settings.SITE_PASSWORD)}
+            "site_password": bool(settings.SITE_PASSWORD), "can_stop": settings.ALLOW_STOP}

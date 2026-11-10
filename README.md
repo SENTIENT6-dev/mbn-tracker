@@ -8,8 +8,13 @@ as a local web app (Python + Django + SQLite). Data lives in `db.sqlite3` in thi
 **Each project manager has their own tracker.** The first time it opens, it asks who you are (you become
 the PM on every project in it); then you add your projects from **Projects → ⋯ → New project**.
 
-## Start it
-Double-click `start.bat`. It opens http://127.0.0.1:8000/ in your browser.
+## Start and stop it
+Double-click the **IO PM Tracker** shortcut on your desktop (made by `install.bat`), or `start.bat`. The tracker runs
+in the background, with no window, and opens http://127.0.0.1:8000/ in your browser once it's ready. If it's
+already running, it just opens the browser.
+
+To stop it, click **Stop tracker** at the bottom of the sidebar. Restarting the PC also stops it. What the tracker
+prints while it runs goes to `tracker.log` in this folder (useful if something goes wrong).
 
 ## Try it with demo data
 `manage.py seed_demo` fills an empty database with made-up projects, POs, invoices and buildings
@@ -32,11 +37,13 @@ Settings for any server (environment variables):
 | `MBN_BACKUP_DIR` | Folder for backups (default: `backups` next to the tracker) |
 | `MBN_BACKUP_KEEP_DAYS` | How long daily backups are kept (default 30) |
 | `MBN_BACKUP_DAILY` | `0` turns the automatic daily backup off |
+| `MBN_ALLOW_STOP` | `0` hides *Stop tracker* (it's already off when `MBN_DEBUG=0`) |
 
 ## Giving a copy to another PM
 1. Copy this folder **without** `db.sqlite3`, `db.backup-*.sqlite3` and `.venv`.
-2. On their PC (Python 3.11 installed): double-click `install.bat` once.
-3. Double-click `start.bat`. The tracker asks for their name and details, then opens empty, ready for their
+2. On their PC (Python 3.11 installed): double-click `install.bat` once. It also puts an **IO PM Tracker**
+   shortcut on their desktop.
+3. Double-click the shortcut (or `start.bat`). The tracker asks for their name and details, then opens empty, ready for their
    projects.
 
 None of this needs administrator rights. Set `MBN_DB` to another file path to try things on a copy of the
